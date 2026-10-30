@@ -1,0 +1,13 @@
+node_modules/
+dist/
+release/
+work/
+.cos-fusion/
+.env
+.env.*
+*.log
+*.tmp
+*.p12
+*.pfx
+*.pem
+*.key

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0d111b">
+  <title>COS Fusion — Workspace Preview 0.2.2</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar-backdrop hidden" id="sidebarBackdrop"></div>
+    <aside class="sidebar" id="sidebar" aria-label="Conversation navigation">
+      <div class="brand"><span class="brand-symbol" aria-hidden="true">✳</span><span>COS <strong>FUSION</strong><small>AGENT WORKSPACE <em>PREVIEW</em></small></span></div>
+      <button id="newChat" class="primary full" type="button"><span aria-hidden="true">＋</span> New conversation <span class="shortcut">Ctrl K</span></button>
+      <div class="section-title">HISTORY <span id="threadCount">0</span></div>
+      <nav id="threads" class="thread-list" aria-label="Recent chats"></nav>
+      <div class="side-bottom"><span class="status-dot"></span> Local workspace<span class="side-caption">Private session · Running on this device</span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="top-left">
+          <button type="button" class="nav-toggle" id="sidebarToggle" aria-label="Open conversations" aria-expanded="false" aria-controls="sidebar">☰</button>
+          <span class="top-icon" aria-hidden="true">◇</span><span class="workspace-label">Workspace</span><span class="subtle slash">/</span><span class="subtle thread-heading" id="threadTitle">New chat</span>
+        </div>
+        <div class="top-actions"><span class="environment-pill"><span class="status-dot"></span> LOCAL</span><button type="button" id="newChatTop" class="outline compact-new">＋ New</button><button type="button" id="settingsToggle" class="outline settings-toggle" aria-controls="settingsPanel" aria-expanded="false">⚙ <span>Customize</span></button></div>
+      </header>
+
+      <section class="workspace">
+        <div class="chat-column">
+          <div id="messages" class="messages" aria-label="Conversation transcript" aria-live="polite" aria-relevant="additions text">
+            <div class="welcome" id="welcome">
+              <div class="hero-icon" aria-hidden="true">✳</div>
+              <div class="eyebrow">YOUR AI WORKSPACE</div>
+              <h1>What are we building?</h1>
+              <p>One calm place for your models, tools and conversations. Choose a provider, shape your workspace, and start creating.</p>
+              <div class="welcome-grid">
+                <div><span aria-hidden="true">⌘</span><strong>Explore a project</strong><small>Read files from an approved local workspace</small></div>
+                <div><span aria-hidden="true">⬡</span><strong>Choose your model</strong><small>OpenAI · Anthropic · OpenRouter · Ollama</small></div>
+                <div><span aria-hidden="true">▦</span><strong>Make it yours</strong><small>Enable modules and import your own skills</small></div>
+              </div>
+              <div class="preview-note"><span class="preview-dot"></span> EARLY PREVIEW · Native coding agents, live browser and cloud execution are still in development.</div>
+            </div>
+          </div>
+
+          <div class="composer-wrap">
+            <div id="notice" class="notice" role="status" aria-live="polite"></div>
+            <div class="provider-bar">
+              <label for="provider">AI provider / agent</label>
+              <select id="provider">
+                <option value="demo">Demo (no API key)</option>
+                <option value="openai">OpenAI API</option>
+                <option value="anthropic">Anthropic API</option>
+                <option value="openrouter">OpenRouter API</option>
+                <option value="ollama">Ollama (local)</option>
+                <option value="hermes">Hermes Agent (installed CLI)</option>
+              </select>
+              <input id="model" type="text" maxlength="120" placeholder="Model ID (not needed for demo)" autocomplete="off">
+              <button id="keyToggle" class="outline tiny" type="button" aria-controls="keyBox" aria-expanded="false">API key</button>
+            </div>
+            <div id="keyBox" class="key-box hidden">
+              <input id="apiKey" type="password" placeholder="API key is kept only while this app is running" autocomplete="off">
+              <button id="saveKey" type="button">Use key</button>
+              <button id="clearKey" type="button" class="outline">Clear</button>
+            </div>
+            <form id="chatForm" class="composer">
+              <textarea id="prompt" rows="3" maxlength="50000" placeholder="Ask COS Fusion anything…  (Try /list with the workspace module enabled)" required></textarea>
+              <div class="compose-foot"><span><span id="charCount">0</span> / 50,000 <span class="key-hint">· Enter to send · Shift+Enter for newline</span></span><button class="primary send" id="send" type="submit">Send <span aria-hidden="true">↗</span></button></div>
+            </form>
+            <div class="footer-hint">Local-first preview · Real AI provider calls may incur charges · Use test data only</div>
+          </div>
+        </div>
+
+        <aside id="settingsPanel" class="settings hidden" aria-label="Workspace customization">
+          <div class="settings-head"><div><strong>Customize workspace</strong><small>Choose exactly what COS can use</small></div><button type="button" class="icon-btn" id="settingsClose" aria-label="Close settings">✕</button></div>
+          <section class="setting-group"><h2>Modules</h2><p>Capabilities are checked again before each tool call.</p><div id="modules"></div></section>
+          <section class="setting-group"><h2>Skills</h2><p>Import Markdown guidance for your assistant. New skills start disabled.</p><div id="skills"></div>
+            <form id="skillForm" class="skill-form"><label for="skillName">Skill name</label><input id="skillName" placeholder="review-code" pattern="[a-zA-Z0-9-]{1,50}" maxlength="50" required>
+              <label for="skillText">Instructions (Markdown)</label><textarea id="skillText" rows="4" maxlength="32000" placeholder="Review architecture before making changes…" required></textarea><button type="submit" class="outline">+ Import skill</button></form>
+          </section>
+          <section class="setting-group"><h2>Workspace</h2><p id="workspace"></p><small>File access is read-only and disabled until enabled above. Restart from a chosen project folder to change this path.</small></section>
+          <section class="setting-group"><h2>Agent engines</h2><p>Hermes uses your installed CLI, existing account and its configured tools. Enable External agents above before sending. Other agents are planned.</p></section>
+          <section class="setting-group"><h2>Coming next</h2><p>Codex / Claude Code engines, workers, terminal, live browser and remote sandbox.</p></section>
+        </aside>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
