@@ -39,11 +39,29 @@ jobs:
             Sort-Object Name -Descending | Select-Object -First 1
           if (-not $ndk) { throw 'Android NDK not installed on build runner' }
           "NDK_HOME=$($ndk.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - name: Build one native Android APK
+      - name: Prepare Gradle with a longer network timeout
         shell: pwsh
         run: |
           npx tauri android init --ci --skip-targets-install
+          if ($LASTEXITCODE -ne 0) { throw 'Tauri Android project initialization failed' }
+          $wrapperProperties = Join-Path $PWD 'src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties'
+          if (-not (Test-Path -LiteralPath $wrapperProperties)) { throw 'Gradle wrapper properties missing' }
+          $properties = @(Get-Content -LiteralPath $wrapperProperties | Where-Object { $_ -notmatch '^networkTimeout=' })
+          $properties += 'networkTimeout=120000'
+          $properties | Set-Content -LiteralPath $wrapperProperties -Encoding utf8
+          $wrapper = Join-Path $PWD 'src-tauri/gen/android/gradlew.bat'
+          $ready = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            & $wrapper --version
+            if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+            if ($attempt -lt 3) { Start-Sleep -Seconds 5 }
+          }
+          if (-not $ready) { throw 'Gradle distribution failed after three timed attempts' }
+      - name: Build one native Android APK
+        shell: pwsh
+        run: |
           npm run native:android
+          if ($LASTEXITCODE -ne 0) { throw 'Android native build failed' }
       - uses: actions/upload-artifact@v4
         with:
           name: Mcp-Agent-Ai-Android
