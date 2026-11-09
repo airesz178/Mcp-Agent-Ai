@@ -32,7 +32,7 @@
       <div class="sidebar-scroll-region" id="sidebarScrollRegion">
         <section class="sidebar-projects" aria-label="Projects">
           <div class="sidebar-group-heading"><button type="button" id="projectsToggle" aria-expanded="true" aria-controls="projectsContent"><svg class="sidebar-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>Projects</button><button type="button" id="projectAdd" aria-label="Add project or phone folder" aria-expanded="false" aria-controls="androidProjectAddMenu" title="Add project"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
-          <div id="androidProjectAddMenu" class="android-project-add-menu hidden"><button id="projectAddGroup" type="button">New project group</button><button id="projectChoosePhoneFolder" type="button">Choose folder on phone</button><button id="projectChooseServerSsh" type="button" disabled title="Android SSH remote workspace transport is not implemented">Folder on a server (SSH) — unavailable</button><p id="projectPhoneFolderStatus" role="status" aria-live="polite"></p></div>
+          <div id="androidProjectAddMenu" class="android-project-add-menu hidden"><button id="projectAddGroup" type="button">New project group</button><button id="projectChoosePhoneFolder" type="button">Choose folder on phone</button><button id="projectChooseServerSsh" type="button" aria-haspopup="dialog" aria-controls="androidSshDialog">Folder on a server (SSH)</button><p id="projectPhoneFolderStatus" role="status" aria-live="polite"></p></div>
           <div id="projectsContent"><div id="projectsList" class="sidebar-projects-list"></div><form id="projectForm" class="project-create-form hidden"><input id="projectName" maxlength="40" type="text" placeholder="Project name" aria-label="Project name" required autocomplete="off"><button type="submit" aria-label="Save project"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L19 7"/></svg></button><button type="button" id="projectCancel" aria-label="Cancel project"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></form><div id="projectManage" class="project-manage hidden"><button id="projectRename" type="button">Rename</button><button id="projectRemove" type="button">Remove group</button><button id="projectUnlinkPhoneFolder" type="button" class="hidden">Remove folder access</button><p id="projectSelectedFolderStatus" role="status"></p></div><button id="projectAssign" class="project-assign hidden" type="button">＋ Add current chat to project</button>
           </div>
         </section>
@@ -331,6 +331,14 @@
                   <button type="button" id="androidPtyToChat">To chat</button>
                 </div>
                 <p class="android-pty-warning">Local shell: commands can change app-owned files. Run only commands you trust. This terminal does not grant AI, MCP or Goals permission to execute commands.</p>
+                <details id="androidToolchainDetails" class="android-termux-details">
+                  <summary>Installed runtimes · Node.js, npm, SSH, Git, Python</summary>
+                  <div class="android-runtime-check">
+                    <p id="androidRuntimeStatus" role="status" aria-live="polite">Check programs available to this app's Android shell. Termux packages are isolated and are not counted as installed here.</p>
+                    <button id="androidRuntimeCheck" type="button">Check installed runtimes</button>
+                    <div id="androidRuntimeResults" class="android-runtime-results" aria-live="polite"></div>
+                  </div>
+                </details>
               </section>
               <details id="androidTermuxDetails" class="android-termux-details">
                 <summary>Optional external Termux app</summary>
@@ -338,7 +346,34 @@
                 <strong>Separate Termux terminal</strong>
                 <p id="androidTermuxStatus" role="status" aria-live="polite">Checking the installed Termux app…</p>
                 <div class="mobile-mcp-actions"><button id="androidTermuxInstall" type="button">Install Termux</button><button id="androidTermuxOpen" class="hidden" type="button">Open Termux terminal</button><button id="androidTermuxRefresh" type="button">Check setup</button></div>
-                <p>Termux runs in its own Android app and asks you to complete setup there. Mcp Agent Ai cannot run arbitrary Termux shell commands inside its own WebView. No terminal session is claimed until an external Termux window actually opens.</p>
+                <p>Termux uses separate Android storage and its own shell. It does not share Mcp Agent Ai project files. Install Node/npm/SSH inside Termux only if you need them.</p>
+                <details id="androidTermuxCommands" class="android-termux-command-panel">
+                  <summary>Run approved Termux tools</summary>
+                  <p id="androidTermuxCommandStatus" role="status" aria-live="polite">Checking whether Termux supports command results and Android has granted permission…</p>
+                  <form id="androidTermuxCommandForm">
+                    <label for="androidTermuxCommandTool">Tool</label>
+                    <select id="androidTermuxCommandTool"><option value="node">Node.js</option><option value="npm">npm</option><option value="ssh">SSH</option></select>
+                    <label for="androidTermuxCommandAction">Action</label>
+                    <select id="androidTermuxCommandAction"><option value="version">Check version</option></select>
+                    <div id="androidTermuxProjectInputs" class="hidden">
+                      <label for="androidTermuxProject">Termux project folder name</label>
+                      <input id="androidTermuxProject" maxlength="40" placeholder="my-project" spellcheck="false" autocomplete="off">
+                      <label for="androidTermuxEntry">JavaScript filename</label>
+                      <input id="androidTermuxEntry" maxlength="70" placeholder="index.js" spellcheck="false" autocomplete="off">
+                    </div>
+                    <div id="androidTermuxSshInputs" class="hidden">
+                      <label for="androidTermuxSshHost">SSH server</label>
+                      <input id="androidTermuxSshHost" maxlength="253" placeholder="server.example.org" spellcheck="false" autocomplete="off">
+                      <label for="androidTermuxSshUser">User</label>
+                      <input id="androidTermuxSshUser" maxlength="32" placeholder="deploy" spellcheck="false" autocomplete="off">
+                      <label for="androidTermuxSshPort">Port</label>
+                      <input id="androidTermuxSshPort" type="number" min="1" max="65535" value="22">
+                    </div>
+                    <button id="androidTermuxCommandRun" type="submit" disabled>Run with approval</button>
+                  </form>
+                  <pre id="androidTermuxCommandResult" class="android-termux-command-result" aria-label="Verified Termux command output"></pre>
+                  <p>Every command requires a visible approval. A result is accepted only after Termux reports a real exit code; starting another app alone does not count as execution.</p>
+                </details>
               </section>
               </details>
               <div id="terminalInspectorLegacy">
@@ -1356,7 +1391,7 @@
               </div>
               <div id="androidPluginsModules" class="android-plugins-modules" aria-live="polite"><p>Checking tools…</p></div>
               <p id="androidPluginsModulesFeedback" class="android-plugins-feedback" role="status" aria-live="polite"></p>
-              <p class="android-plugins-marketplace-roadmap">GitHub, Cloudflare and third-party downloadable plugins require separate authenticated adapters and package verification. They are not installed by this catalog.</p>
+              <p class="android-plugins-marketplace-roadmap">Bundled plugins can be installed or removed from the native catalog without changing the APK. Their code is updated when the app is updated. Downloadable third-party packages and silent background auto-updates require separate authenticated package verification.</p>
             </div>
             <div class="android-plugins-card">
               <div class="android-plugins-section-title"><strong>04 · External MCP servers</strong><span>HTTPS connections</span></div>
@@ -1395,6 +1430,36 @@
         </aside>
       </section>
     </main>
+    <dialog id="androidSshDialog" class="android-ssh-dialog" aria-labelledby="androidSshTitle" aria-describedby="androidSshExplanation">
+      <header><h2 id="androidSshTitle">Add a folder on a server</h2><button id="androidSshClose" type="button" aria-label="Close SSH setup">Close</button></header>
+      <form id="androidSshForm" method="dialog" novalidate>
+        <p id="androidSshExplanation">Connect to a server using a private, verified SSH client. This Android app requires key authentication and a pinned server identity before remote access.</p>
+        <label for="androidSshProject">Project</label>
+        <select id="androidSshProject" required aria-label="Project to link with server"></select>
+        <button id="androidSshManageProjects" type="button" class="outline">Manage native projects</button>
+        <div id="androidSshStorageSlot" class="hidden" aria-label="Native project storage settings"></div>
+        <label for="androidSshAddress">SSH address</label>
+        <input id="androidSshAddress" type="text" required maxlength="180" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="me@server or me@server:2222">
+        <label for="androidSshFolder">Folder on the server</label>
+        <input id="androidSshFolder" type="text" required maxlength="256" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="/srv/app">
+        <details id="androidSshSecurityDetails"><summary>SSH key &amp; host verification</summary>
+          <p>Install your generated project public key in the server's authorized_keys. Enter the server host's Ed25519 public key from an independent trusted source. No password or private key is sent to the page.</p>
+          <label><input id="androidSshKeyConsent" type="checkbox"> I allow an unencrypted project SSH private key to be stored inside this app's private data.</label>
+          <button id="androidSshGenerateKey" type="button">Generate / view project public key</button>
+          <textarea id="androidSshClientPublicKey" rows="2" readonly placeholder="Project public key appears here"></textarea>
+          <button id="androidSshCopyKey" type="button">Copy project public key</button>
+          <label for="androidSshHostPublicKey">Trusted server Ed25519 host public key</label>
+          <textarea id="androidSshHostPublicKey" rows="3" maxlength="200" spellcheck="false" autocomplete="off" placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI..."></textarea>
+          <button id="androidSshPinHost" type="button">Save verified host identity</button>
+        </details>
+        <p id="androidSshStatus" role="status" aria-live="polite">No connection attempted. Your project and files remain unchanged until the host is verified.</p>
+        <div id="androidSshHostKeyReview" class="hidden" aria-label="SSH host identity verification">
+          <strong>Verify this host identity</strong><code id="androidSshFingerprint"></code>
+          <label><input id="androidSshTrustHost" type="checkbox"> I verified this fingerprint with my server administrator</label>
+        </div>
+        <footer><button id="androidSshCancel" type="button">Cancel</button><button id="androidSshSubmit" type="submit">Test and add</button></footer>
+      </form>
+    </dialog>
   </div>
 </body>
 </html>

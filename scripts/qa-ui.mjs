@@ -5704,6 +5704,14 @@ try {
     window.__projectFolderBindings = {};
     window.__projectFolderCalls = [];
     window.__projectFolderMode = 'success';
+    window.__termuxRunAuthorized = false;
+    window.__termuxRunCalls = [];
+    window.__termuxRunMode = 'verified';
+    window.__sshCalls = [];
+    window.__sshMode = 'fail';
+    const sshWire = Uint8Array.from([0,0,0,11,
+      ...new TextEncoder().encode('ssh-ed25519'),0,0,0,32,...Array(32).fill(42)]);
+    window.__sshHostKey = 'ssh-ed25519 '+btoa(String.fromCharCode(...sshWire));
     window.__androidNativeToolCalls = [];
     window.__mcpAuditEvents = [];
     window.__mcpAuditQueries = 0;
@@ -5915,6 +5923,30 @@ try {
             mode:'external-termux-app',inAppShellAvailable:false,setupVerified:false,
             installIsUserManaged:true,commandsAvailableInApp:false};
         }
+        if (command === 'android_termux_command_status') {
+          return {supported:!!window.__termuxInstalled,
+            installed:!!window.__termuxInstalled,
+            runCommandPermissionGranted:window.__termuxRunAuthorized,
+            foreground:true,running:false,termuxResultSupported:true,
+            allowExternalAppsVerified:false,termuxExecutionContext:'external-termux-app',
+            termuxWorkspaceShared:false,userInitiatedRequired:true,
+            maxConcurrency:1,maxOutputBytes:16384,maxWaitMs:30000};
+        }
+        if (command === 'android_termux_command_run') {
+          window.__termuxRunCalls.push(structuredClone(args));
+          if (!window.__termuxRunAuthorized || args.userInitiated!==true ||
+              args.tool!=='node' || args.action!=='version' ||
+              args.project!==undefined || args.entry!==undefined ||
+              !/^[0-9a-f-]{36}$/.test(args.requestId))
+            throw Error('Unapproved or unsafe Termux command');
+          if (window.__termuxRunMode==='error')
+            throw Error('PendingIntent callback missing or timed out');
+          return {requestId:args.requestId,tool:args.tool,action:args.action,
+            processStarted:true,completed:true,resultVerified:true,success:true,
+            exitCode:0,stdout:'v22.0.0',stderr:'',stdoutOriginalLength:7,
+            stderrOriginalLength:0,timedOut:false,
+            termuxExecutionContext:'external-termux-app',termuxWorkspaceShared:false};
+        }
         if (command === 'android_termux_install') {
           if (args?.userInitiated !== true) throw Error('Termux install requires user action');
           window.__androidNativeToolCalls.push('termux:install');
@@ -6038,6 +6070,37 @@ try {
             return {...state};
           }
           throw Error('Unexpected in-app browser command: '+command);
+        }
+        if (command.startsWith('android_project_ssh_')) {
+          window.__sshCalls.push({command,args:structuredClone(args)});
+          if(args.userInitiated!==true||!window.__nativeProjectsQA.projects
+              .some(project=>project.id===args.projectId))
+            throw Error('SSH action must be explicitly approved for native project');
+          if(command==='android_project_ssh_identity'){
+            if(args.confirmUnencryptedKeyStorage!==true)throw Error('SSH key consent missing');
+            return {projectId:args.projectId,generated:true,
+              publicKey:window.__sshHostKey,privateKeyExported:false,
+              privateKeyStoredIn:'app-private-project-dir',
+              privateKeyPassphraseProtected:false,remoteAuthorizationVerified:false};
+          }
+          if(command==='android_project_ssh_pin'){
+            if(args.confirmedTrustedHostKey!==true||args.publicKey!==window.__sshHostKey ||
+                args.host!=='qa.example.org'||args.port!==2222)
+              throw Error('Unreviewed or invalid host identity');
+            return {projectId:args.projectId,host:args.host,port:args.port,
+              pinned:true,newPin:true,replacedExistingPin:false,remoteHostVerifiedByApp:false};
+          }
+          if(command==='android_project_ssh_run'){
+            if(args.host!=='qa.example.org'||args.port!==2222||
+                args.username!=='tester'||args.action!=='pwd'||args.remoteDir!=='/srv/app')
+              throw Error('Unexpected SSH command or unsafe project folder');
+            if(window.__sshMode!=='success')throw Error('SSH executable unavailable inside app UID');
+            return {projectId:args.projectId,host:args.host,port:args.port,
+              remoteDir:args.remoteDir,hostKeyPolicy:'strict-pinned',
+              authenticationMethod:'publickey-only',processStarted:true,
+              completed:true,success:true,stdout:'/srv/app',stderr:'',exitCode:0};
+          }
+          throw Error('Unrecognized SSH command');
         }
         if (command.startsWith('document_tree_project_folder_')) {
           const id = args?.projectId;
@@ -7713,8 +7776,11 @@ try {
   await nativeTools.screenshot({
     path:path.join(screenshotFolder,'native-android-pty-stopped-tabs.png')
   });
-  await nativeTools.locator('#androidTermuxDetails summary').click();
+  await nativeTools.locator('#androidTermuxDetails > summary').click();
   await nativeTools.locator('#androidTermuxStatus').getByText('not installed', {exact:false}).waitFor();
+  await nativeTools.locator('#androidTermuxCommands > summary').click();
+  ensure(await nativeTools.locator('#androidTermuxCommandRun').isDisabled(),
+    'Termux RUN_COMMAND must be blocked when Android permission or installation is missing');
   ensure(await nativeTools.locator('#androidTermuxInstall').isVisible() &&
     await nativeTools.locator('#terminalForm').isHidden(),
     'External Termux must remain optional and distinct from the in-app PTY');
@@ -7726,6 +7792,27 @@ try {
   await nativeTools.evaluate(() => { window.__termuxInstalled = true; });
   await nativeTools.locator('#androidTermuxRefresh').click();
   await nativeTools.locator('#androidTermuxOpen').waitFor({state:'visible'});
+  ensure(await nativeTools.locator('#androidTermuxCommandRun').isDisabled(),
+    'Installing Termux alone must not authorize external RUN_COMMAND');
+  await nativeTools.evaluate(() => { window.__termuxRunAuthorized = true; });
+  await nativeTools.locator('#androidTermuxRefresh').click();
+  await nativeTools.waitForFunction(() => {
+    const node=document.getElementById('androidTermuxCommandRun');
+    return node && !node.disabled;
+  },null,{timeout:10000});
+  ensure(await nativeTools.locator('#androidTermuxCommandRun').isEnabled(),
+    'Command must be explicitly enabled only after fresh authorized native status');
+  nativeTools.once('dialog', dialog => dialog.accept());
+  await nativeTools.locator('#androidTermuxCommandRun').click();
+  await nativeTools.locator('#androidTermuxCommandResult').getByText('v22.0.0').waitFor();
+  ensure((await nativeTools.evaluate(() => window.__termuxRunCalls)).length===1,
+    'One native Termux execution must return a checked actual process result');
+  await nativeTools.evaluate(() => { window.__termuxRunMode='error'; });
+  nativeTools.once('dialog', dialog => dialog.accept());
+  await nativeTools.locator('#androidTermuxCommandRun').click();
+  await nativeTools.locator('#androidTermuxCommandStatus').getByText('No verified Termux execution',{exact:false}).waitFor();
+  ensure((await nativeTools.evaluate(() => window.__termuxRunCalls)).length===2,
+    'Missing Android callback must never fabricate process success');
   await nativeTools.locator('#androidTermuxOpen').click();
   ensure((await nativeTools.evaluate(() => window.__androidNativeToolCalls)).includes('termux:open') &&
     await nativeTools.locator('#terminalForm').isHidden(),
@@ -7915,14 +8002,60 @@ try {
   await closeNativeAndroidSettings(nativeTools);
   await nativeTools.locator('#sidebarToggle').click();
   await nativeTools.locator('#projectAdd').click();
-  ensure(await nativeTools.locator('#projectChooseServerSsh').isDisabled(),
-    'Android server SSH option must not impersonate a working remote workspace transport');
+  ensure(await nativeTools.locator('#projectChooseServerSsh').isEnabled(),
+    'Android Projects + must expose the SSH setup dialog');
+  await nativeTools.locator('#projectChooseServerSsh').click();
+  ensure(await nativeTools.locator('#androidSshDialog').evaluate(node=>node.open) &&
+    await nativeTools.locator('#androidSshSubmit').isDisabled() &&
+    (await nativeTools.locator('#androidSshStatus').innerText()).includes('Create a native project group'),
+    'SSH setup must require an existing native project before attempting remote access');
+  await nativeTools.locator('#androidSshCancel').click();
+  ensure(!(await nativeTools.locator('#androidSshDialog').evaluate(node=>node.open)),
+    'Cancel must close SSH setup without creating a remote project');
+  await nativeTools.locator('#projectAdd').click();
   await nativeTools.locator('#projectAddGroup').click();
   const existingFilesTabGrant = await nativeTools.evaluate(() => window.__treeTestGranted);
   await nativeTools.locator('#projectName').fill('Native synthetic group');
   await nativeTools.locator('#projectForm button[type="submit"]').click();
   await nativeTools.locator('#projectsList').getByText('Native synthetic group').waitFor();
   const createdProjectId = 'f2a19e15-9921-4fc7-87a5-a02c3f38cb4f';
+  await nativeTools.locator('#projectAdd').click();
+  await nativeTools.locator('#projectChooseServerSsh').click();
+  ensure(await nativeTools.locator('#androidSshSubmit').isEnabled() &&
+      await nativeTools.locator('#androidSshDialog').evaluate(node=>node.open),
+    'SSH form must require a real native project before showing credentials');
+  await nativeTools.locator('#androidSshAddress').fill('tester@qa.example.org:2222');
+  await nativeTools.locator('#androidSshFolder').fill('/srv/app');
+  await nativeTools.locator('#androidSshSubmit').click();
+  await nativeTools.locator('#androidSshStatus').getByText('SSH project not linked',{exact:false}).waitFor();
+  ensure(await nativeTools.locator('#androidSshDialog').evaluate(node=>node.open) &&
+      await nativeTools.evaluate(id=>JSON.parse(localStorage.getItem(
+        'mcp-agent-ai-android-project-ssh-links-v1')||'{}')[id]===undefined,createdProjectId),
+    'A missing real SSH executable cannot be reported as a linked remote project');
+  await nativeTools.locator('#androidSshSecurityDetails').evaluate(node=>node.open=true);
+  await nativeTools.locator('#androidSshKeyConsent').check();
+  await nativeTools.locator('#androidSshGenerateKey').click();
+  await nativeTools.locator('#androidSshClientPublicKey').waitFor({state:'visible'});
+  ensure((await nativeTools.locator('#androidSshClientPublicKey').inputValue()).startsWith('ssh-ed25519 '),
+    'SSH public identity must come from native receipt');
+  await nativeTools.locator('#androidSshHostPublicKey').fill(await nativeTools.evaluate(()=>window.__sshHostKey));
+  await nativeTools.locator('#androidSshPinHost').click();
+  ensure((await nativeTools.locator('#androidSshFingerprint').innerText()).startsWith('SHA256:') &&
+      (await nativeTools.evaluate(()=>window.__sshCalls.filter(
+        c=>c.command==='android_project_ssh_pin').length))===0,
+    'First pin click must show fingerprint without trusting unapproved host');
+  await nativeTools.locator('#androidSshTrustHost').check();
+  await nativeTools.locator('#androidSshPinHost').click();
+  await nativeTools.locator('#androidSshStatus').getByText('Trusted host key pinned',{exact:false}).waitFor();
+  await nativeTools.evaluate(()=>window.__sshMode='success');
+  await nativeTools.locator('#androidSshSubmit').click();
+  await nativeTools.locator('#androidSshDialog').waitFor({state:'hidden'});
+  ensure(await nativeTools.evaluate(id=>{
+    const saved=JSON.parse(localStorage.getItem('mcp-agent-ai-android-project-ssh-links-v1')||'{}')[id];
+    return saved?.host==='qa.example.org' && saved.port===2222 &&
+      saved.username==='tester'&&saved.remoteDir==='/srv/app'&&
+      typeof saved.verifiedAtMs==='number';
+  },createdProjectId),'SSH link may be stored only after a strict pinned-key process receipt');
   ensure((await nativeTools.evaluate(() => window.__projectFolderCalls.length)) === 0,
     'Creating a Project must not silently request Android folder access');
   await nativeTools.locator('#projectAdd').click();

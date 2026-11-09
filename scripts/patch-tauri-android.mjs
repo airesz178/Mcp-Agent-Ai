@@ -94,6 +94,9 @@ if (fixedActivity !== activity) await writeFile(activityPath, fixedActivity);
 const manifestPath = path.join(root, 'src-tauri', 'gen', 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
 const manifest = await readFile(manifestPath, 'utf8');
 const permissionTags = [
+  // User-granted Android "Additional permissions" for external Termux
+  // RUN_COMMAND. Declaring it is NOT an OS grant or Termux approval.
+  '<uses-permission android:name="com.termux.permission.RUN_COMMAND" />',
   '<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />',
   // Android requires this normal manifest permission before it will show the
   // package-scoped battery exemption consent dialog. The OS grant is still
@@ -286,6 +289,17 @@ if (!updatedManifest.includes('android:name=".ForegroundRuntimeService"')) {
       !serviceTag.includes('android:foregroundServiceType="specialUse"'))
     throw new Error('Foreground runtime service declaration does not match guarded manifest');
 }
+// Termux returns RUN_COMMAND results through a one-shot PendingIntent to a
+// private receiver; no exported Android callback accepts arbitrary broadcasts.
+const termuxResultReceiver = '<receiver android:name=".TermuxRunResultReceiver" android:exported="false" />';
+if (!updatedManifest.includes('android:name=".TermuxRunResultReceiver"')) {
+  if (!updatedManifest.includes('    </application>'))
+    throw new Error('Termux result receiver manifest insertion point unavailable');
+  updatedManifest = updatedManifest.replace('    </application>',
+    '        ' + termuxResultReceiver + '\n    </application>');
+} else if (!updatedManifest.includes(termuxResultReceiver)) {
+  throw new Error('Existing Termux result receiver does not match non-exported policy');
+}
 if (updatedManifest !== manifest) await writeFile(manifestPath, updatedManifest);
 await copyFile(
   path.join(root, 'android', 'StorageAccessPlugin.kt'),
@@ -313,7 +327,8 @@ await copyFile(
     'ai', 'mcpagent', 'app', 'ChatGptOAuthPlugin.kt')
 );
 for (const file of [
-  'AppTerminalPlugin.kt', 'ReviewSharePlugin.kt',
+  'AppTerminalPlugin.kt', 'TermuxRunPolicy.kt',
+  'TermuxRunResultReceiver.kt', 'ReviewSharePlugin.kt',
   'PetOverlayPlugin.kt',
   'SpeechDictationPlugin.kt',
   'TunnelCredentialPlugin.kt',
@@ -326,6 +341,10 @@ for (const file of [
   await copyFile(path.join(root, 'android', file),
     path.join(root, 'src-tauri', 'gen', 'android', 'app', 'src', 'main', 'java', 'ai', 'mcpagent', 'app', file));
 }
+const generatedTerminalTestDir = path.join(root, 'src-tauri', 'gen', 'android', 'app', 'src', 'test', 'java', 'ai', 'mcpagent', 'app');
+await mkdir(generatedTerminalTestDir, {recursive:true});
+await copyFile(path.join(root, 'android', 'TermuxRunPolicyTest.kt'),
+  path.join(generatedTerminalTestDir, 'TermuxRunPolicyTest.kt'));
 // Delete generated copies of retired functionality. The old Android
 // Plugins approval notification/dialog has no UI or native registration:
 // ChatGPT's own Plugins permission setting now governs tool calls.

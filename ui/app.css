@@ -5554,6 +5554,111 @@ html.native-android .android-connection-core {
   border-top:1px solid #424854;border-bottom:1px solid #424854;
   font-size:12px;
 }
+html.native-android .android-runtime-check {
+  padding:9px 11px 11px;display:flex;flex-direction:column;gap:8px;
+}
+html.native-android .android-runtime-check p {
+  margin:0;font-size:11px;line-height:1.5;color:#c3cbd8;
+}
+html.native-android .android-runtime-check button {align-self:flex-start;min-height:35px;}
+html.native-android .android-runtime-results {display:grid;grid-template-columns:1fr;gap:6px;}
+html.native-android .android-runtime-tool {display:flex;justify-content:space-between;gap:7px;align-items:center;
+  border:1px solid #3f4650;padding:6px 9px;border-radius:8px;font-size:11px;
+}
+html.native-android .android-runtime-tool strong {font-weight:600;color:#e2e7f0;}
+html.native-android .android-runtime-tool span {font-size:10px;color:#b5bfce;text-align:right;}
+html.native-android .android-runtime-tool[data-ready="true"] span {color:#b4ddc6;}
+html.native-android .android-plugins-module-actions {
+  display:flex;flex-direction:column;gap:6px;min-width:96px;align-items:stretch;
+}
+html.native-android .android-plugins-module-actions button {width:100%;font-size:11px;}
+html.native-android .android-plugins-update-note {
+  display:block;max-width:165px;color:#9da9b7;font-size:10px;line-height:1.4;
+}
+html.native-android .android-ssh-dialog {
+  box-sizing:border-box;max-height:min(88dvh,680px);overflow:auto;
+  width:min(690px,calc(100vw - 24px));padding:0;
+  border:1px solid #434954;border-radius:23px;background:#262626;
+  color:#f0f0f0;box-shadow:0 12px 45px #000b;
+}
+html.native-android .android-ssh-dialog::backdrop {background:rgba(0,0,0,.69);}
+html.native-android .android-ssh-dialog > header {
+  display:flex;align-items:center;justify-content:space-between;gap:15px;
+  border-bottom:1px solid #393939;padding:16px 20px;
+}
+html.native-android .android-ssh-dialog h2 {font-size:17px;margin:0;line-height:1.35;}
+html.native-android .android-ssh-dialog > header button {
+  min-height:35px;border:none;background:transparent;color:#bcbcbc;font-size:12px;
+}
+html.native-android #androidSshForm {display:flex;flex-direction:column;gap:9px;padding:18px 20px 0;}
+html.native-android #androidSshForm p {margin:0 0 5px;font-size:12px;line-height:1.55;}
+html.native-android #androidSshForm > label {font-weight:650;font-size:12px;margin-top:8px;}
+html.native-android #androidSshForm > input,
+html.native-android #androidSshForm > select {
+  min-height:43px;width:100%;box-sizing:border-box;border-radius:10px;
+  border:1px solid #555;background:#1e1e1e;color:#e5e5e5;
+  padding:10px 13px;font-size:12px;
+}
+html.native-android #androidSshForm > #androidSshManageProjects {
+  align-self:start;min-height:32px;padding:5px 9px;font-size:11px;
+}
+html.native-android #androidSshForm > #androidSshStatus {color:#bbc6d6;font-size:11px;}
+html.native-android #androidSshSecurityDetails {
+  margin:3px 0;padding:10px;border:1px solid #4f5665;border-radius:11px;
+  background:#202226;font-size:11px;color:#d5dbe7;
+}
+html.native-android #androidSshSecurityDetails summary {cursor:pointer;font-size:12px;font-weight:650;}
+html.native-android #androidSshSecurityDetails[open] {display:flex;flex-direction:column;gap:9px;}
+html.native-android #androidSshSecurityDetails label {display:flex;gap:8px;align-items:flex-start;line-height:1.4;}
+html.native-android #androidSshSecurityDetails textarea {
+  box-sizing:border-box;width:100%;padding:9px;border:1px solid #4e5461;
+  border-radius:9px;background:#15191f;color:#e9edf3;font-size:11px;
+  resize:vertical;overflow-wrap:anywhere;
+}
+html.native-android #androidSshSecurityDetails button {
+  align-self:start;min-height:35px;padding:7px 10px;font-size:11px;
+}
+html.native-android #androidSshHostKeyReview:not(.hidden) {
+  border:1px solid #816c44;border-radius:9px;padding:12px;
+  display:flex;flex-direction:column;gap:8px;background:#41321a;color:#ffefce;
+}
+html.native-android #androidSshFingerprint {display:block;overflow-wrap:anywhere;font-size:12px;}
+html.native-android #androidSshHostKeyReview label {display:flex;gap:8px;align-items:flex-start;font-size:11px;}
+html.native-android #androidSshForm footer {
+  display:flex;align-items:center;justify-content:flex-end;gap:8px;
+  border-top:1px solid #393939;margin:12px -20px 0;padding:14px 20px;
+}
+html.native-android #androidSshForm footer button {
+  min-height:37px;padding:8px 14px;border-radius:22px;font-weight:650;font-size:12px;
+}
+html.native-android #androidSshSubmit {background:#dce9f7;color:#13233a;}
+html.native-android #androidSshForm footer button:disabled {opacity:.48;cursor:not-allowed;}
+html.native-android .android-termux-command-panel {
+  border:1px solid #47536a;border-radius:11px;padding:10px 12px;
+  margin-top:12px;background:#202733;
+}
+html.native-android .android-termux-command-panel summary {font-weight:650;font-size:12px;cursor:pointer;}
+html.native-android .android-termux-command-panel p {font-size:11px;line-height:1.5;margin:9px 0;}
+html.native-android #androidTermuxCommandForm {display:flex;flex-direction:column;gap:7px;margin:10px 0;}
+html.native-android #androidTermuxCommandForm label {font-size:11px;color:#d0dded;font-weight:650;}
+html.native-android #androidTermuxCommandForm input,
+html.native-android #androidTermuxCommandForm select {
+  min-height:38px;box-sizing:border-box;width:100%;border-radius:8px;
+  border:1px solid #506079;background:#172234;color:#e8eef7;
+  padding:8px 10px;font-size:12px;
+}
+html.native-android #androidTermuxProjectInputs:not(.hidden),
+html.native-android #androidTermuxSshInputs:not(.hidden) {
+  display:flex;flex-direction:column;gap:7px;
+}
+html.native-android #androidTermuxCommandForm button {min-height:38px;align-self:flex-start;}
+html.native-android #androidTermuxCommandForm button:disabled {opacity:.5;}
+html.native-android .android-termux-command-result {
+  max-height:230px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;
+  background:#121a25;color:#d5e9dd;border-radius:8px;font-size:11px;
+  padding:10px;margin:0;
+}
+html.native-android .android-termux-command-result:empty {display:none;}
 html.native-android .android-connection-core > strong {color:#e3e9f2;}
 html.native-android #androidConnectionCoreStatus {color:#bac4d2;font-size:11px;line-height:1.45;}
 html.native-android #androidConnectionCoreToggle[data-active="true"] {border-color:#8c9aab;}

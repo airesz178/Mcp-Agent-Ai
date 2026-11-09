@@ -45,6 +45,7 @@ test('Android Plugins share the Core Tunnel and keep independent module controls
             {id:'security_audit',name:'Security Audit',
               description:'Scan bounded text for security risks without revealing secrets',
               available:true,enabled:false,ready:false,tools:0,category:'security',
+              installed:true,installation:'bundled_with_app',updateSupported:false,
               risk:'read_only',version:'0.1.0',sourceLabel:'Bundled Android',
               toolNames:['security_audit_analyze'],permissions:[]},
             {id:'reverse_engineering',name:'DEX Header Inspector',
@@ -66,6 +67,7 @@ test('Android Plugins share the Core Tunnel and keep independent module controls
           {id:'security_audit',name:'Security Audit',
             description:'Scan bounded text for security risks without revealing secrets',
             available:true,enabled:false,ready:false,tools:0,category:'security',
+            installed:true,installation:'bundled_with_app',updateSupported:false,
             risk:'read_only',version:'0.1.0',sourceLabel:'Bundled Android',
             toolNames:['security_audit_analyze'],permissions:[]},
           {id:'reverse_engineering',name:'DEX Header Inspector',
@@ -106,6 +108,28 @@ test('Android Plugins share the Core Tunnel and keep independent module controls
             window.__pluginStatus.availableTools=window.__pluginStatus.plugins
               .reduce((sum,p)=>sum+p.tools,0);
             return structuredClone(window.__pluginStatus);
+          }
+          if (command === 'android_plugins_uninstall_bundled' ||
+              command === 'android_plugins_install_bundled') {
+            if (args.userInitiated !== true || args.pluginId !== 'security_audit')
+              throw Error('Unexpected install request');
+            const install = command === 'android_plugins_install_bundled';
+            const entry=window.__pluginStatus.plugins.find(p=>p.id===args.pluginId);
+            if (entry.installed === install) throw Error('Already in requested state');
+            entry.installed=install;
+            entry.enabled=false;
+            entry.ready=false;
+            entry.tools=0;
+            window.__pluginStatus.availableTools=window.__pluginStatus.plugins.reduce(
+              (sum,p)=>sum+p.tools,0);
+            return structuredClone(window.__pluginStatus);
+          }
+          if (command === 'android_plugins_check_update') {
+            if(args.pluginId!=='security_audit'||args.userInitiated!==true)
+              throw Error('Unexpected plugin update check');
+            return {pluginId:args.pluginId,checkSucceeded:false,updateAvailable:false,
+              version:null,url:null,reason:'no_published_release',
+              automaticInstallSupported:false,signingCompatibilityVerified:false};
           }
           if (command === 'android_tunnel_open_platform_page') {
             window.__pluginCalls.push({command,args:structuredClone(args)});
@@ -182,6 +206,27 @@ test('Android Plugins share the Core Tunnel and keep independent module controls
         '1 enabled · 3 available');
       await page.getByRole('button',{name:'Disable Security Audit'}).click();
       await page.getByRole('button',{name:'Enable Security Audit'}).waitFor();
+      page.on('dialog',dialog=>dialog.accept());
+      assert.equal(await page.getByRole('button',{name:'Uninstall bundled Security Audit'}).count(),1);
+      await page.getByRole('button',{name:'Uninstall bundled Security Audit'}).click();
+      await page.getByRole('button',{name:'Install bundled Security Audit'}).waitFor();
+      assert.equal(await page.getByRole('button',{name:'Enable Security Audit'}).count(),0,
+        'Uninstalled module may not expose enable control');
+      await page.getByRole('button',{name:'Install bundled Security Audit'}).click();
+      await page.getByRole('button',{name:'Uninstall bundled Security Audit'}).waitFor();
+      assert.equal(await page.getByRole('button',{name:'Enable Security Audit'}).isDisabled(),false,
+        'Reinstalled bundled module remains disabled but may be separately enabled');
+      assert.deepEqual(await page.evaluate(()=>window.__pluginCalls.filter(
+        entry=>['android_plugins_uninstall_bundled','android_plugins_install_bundled']
+          .includes(entry.command)).map(entry=>entry.command)),[
+        'android_plugins_uninstall_bundled','android_plugins_install_bundled'
+      ]);
+      await page.getByRole('button',{name:'Check official update for Security Audit'}).click();
+      await page.locator('#androidPluginsModulesFeedback').getByText(
+        'official update check unavailable',{exact:false}).waitFor();
+      assert.equal(await page.evaluate(()=>window.__pluginCalls.filter(
+        call=>call.command==='android_plugins_check_update').length),1,
+        'Bundled update check must invoke the native HTTPS metadata reader exactly once');
       assert.equal(await page.locator('#androidPluginsMarketplaceSummary').textContent(),
         '0 enabled · 3 available');
       assert.equal(await page.locator('#androidPluginsModules').getByText('Memory',{exact:true}).isVisible(),true);

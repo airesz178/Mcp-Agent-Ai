@@ -1129,6 +1129,287 @@
       button.disabled = false;
     }
   });
+  var androidSshDialog = $("androidSshDialog");
+  var androidSshBusy = false;
+  var androidSshLinksKey = "mcp-agent-ai-android-project-ssh-links-v1";
+  function androidSshSavedLink(projectId) {
+    try {
+      const links = JSON.parse(localStorage.getItem(androidSshLinksKey) || "{}");
+      const item = links?.[projectId];
+      if (!item || typeof item !== "object" || typeof item.host !== "string" || typeof item.username !== "string" || typeof item.remoteDir !== "string" || !Number.isInteger(item.port) || item.port < 1 || item.port > 65535 || !Number.isFinite(item.verifiedAtMs) || item.verifiedAtMs < 0) return null;
+      return item;
+    } catch {
+      return null;
+    }
+  }
+  function saveAndroidSshLink(projectId, link) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(androidSshLinksKey) || "{}");
+      const saved = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+      saved[projectId] = link;
+      if (Object.keys(saved).length > 30) throw Error("SSH link capacity exceeded");
+      localStorage.setItem(androidSshLinksKey, JSON.stringify(saved));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function androidSshCurrentProjectId() {
+    const value = $("androidSshProject").value;
+    return nativeProjectMode && mobileProjects.some((item) => item.id === value) ? value : null;
+  }
+  function androidSshParseAddress() {
+    const address = $("androidSshAddress").value.trim();
+    const match = /^([a-zA-Z][a-zA-Z0-9_.-]{0,31})@([a-zA-Z0-9][a-zA-Z0-9.-]{0,252})(?::([0-9]{1,5}))?$/.exec(address);
+    if (!match) throw Error("Use user@server or user@server:port (key authentication only).");
+    const port = match[3] ? Number(match[3]) : 22;
+    if (port < 1 || port > 65535 || match[2].includes("..") || match[2].endsWith(".") || match[2].startsWith("-")) throw Error("Invalid SSH host or port.");
+    return { username: match[1], host: match[2].toLowerCase(), port };
+  }
+  function androidSshRemoteFolder() {
+    const remote = $("androidSshFolder").value.trim();
+    if (!remote.startsWith("/") || remote.length > 256 || remote.includes("//") || remote.split("/").some((part, index) => index > 0 && (part === ".." || part === ".")) || !/^\/[a-zA-Z0-9._/-]*$/.test(remote))
+      throw Error("Use an absolute server folder such as /srv/app. Relative paths and shell characters are blocked.");
+    return remote;
+  }
+  function androidSshLoadLink(projectId) {
+    const saved = projectId ? androidSshSavedLink(projectId) : null;
+    $("androidSshAddress").value = saved ? `${saved.username}@${saved.host}${saved.port === 22 ? "" : ":" + saved.port}` : "";
+    $("androidSshFolder").value = saved?.remoteDir || "";
+    if (saved) $("androidSshStatus").textContent = "Saved SSH address loaded. The prior test is historical; connection must be verified again.";
+  }
+  function androidSshSetBusy(busy) {
+    androidSshBusy = busy;
+    for (const id of [
+      "androidSshGenerateKey",
+      "androidSshPinHost",
+      "androidSshClose",
+      "androidSshCancel",
+      "androidSshManageProjects"
+    ])
+      $(`${id}`).disabled = busy;
+    $("androidSshSubmit").disabled = busy || !androidSshCurrentProjectId();
+  }
+  function androidSshError(error) {
+    return String(error instanceof Error ? error.message : error).slice(0, 230);
+  }
+  async function androidSshHostFingerprint(publicKey) {
+    const parts = publicKey.trim().split(/\s+/);
+    if (parts.length !== 2 || parts[0] !== "ssh-ed25519" || !/^[a-zA-Z0-9+/]{68}$/.test(parts[1])) throw Error("Enter one Ed25519 host public key without a trailing comment.");
+    const decoded = atob(parts[1]);
+    if (decoded.length !== 51) throw Error("Invalid SSH host key bytes.");
+    const wire = Uint8Array.from(decoded, (c) => c.charCodeAt(0));
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", wire));
+    return "SHA256:" + btoa(String.fromCharCode(...digest)).replace(/=+$/, "");
+  }
+  function resetAndroidSshHostReview() {
+    $("androidSshHostKeyReview").classList.add("hidden");
+    $("androidSshTrustHost").checked = false;
+  }
+  function restoreAndroidSshStorageSettings() {
+    const original = $("androidWorkspaceLegacyBindings");
+    const settings = $("projectStorageSettings");
+    if (settings.parentElement !== original) original.append(settings);
+    settings.style.removeProperty("display");
+    $("androidSshStorageSlot").classList.add("hidden");
+  }
+  function renderAndroidSshProjects() {
+    const select = $("androidSshProject");
+    const previous = select.value;
+    select.replaceChildren();
+    for (const project of nativeProjectMode ? mobileProjects : []) {
+      const option = document.createElement("option");
+      option.value = project.id;
+      option.textContent = project.name + (androidSshSavedLink(project.id) ? " \xB7 SSH" : "");
+      select.append(option);
+    }
+    if (previous && mobileProjects.some((item) => item.id === previous)) select.value = previous;
+    else if (selectedProjectId && mobileProjects.some((item) => item.id === selectedProjectId))
+      select.value = selectedProjectId;
+    $("androidSshSubmit").disabled = androidSshBusy || !select.value;
+    if (!nativeProjectMode) {
+      $("androidSshStatus").textContent = "Native project storage is required for an SSH workspace. Your existing local project labels are preserved until you approve migration.";
+    } else if (!mobileProjects.length) {
+      $("androidSshStatus").textContent = "Create a native project group first, then add its remote folder.";
+    }
+  }
+  $("projectChooseServerSsh").addEventListener("click", async () => {
+    closeAndroidProjectAddMenu();
+    if (!nativeAndroidRuntime || !isTauri()) {
+      $("projectPhoneFolderStatus").textContent = "SSH projects require the installed Android app.";
+      return;
+    }
+    $("androidSshStatus").textContent = "No connection attempted. Server identity must be verified.";
+    resetAndroidSshHostReview();
+    if (nativeProjectMode) await refreshNativeProjectCatalog();
+    renderAndroidSshProjects();
+    androidSshLoadLink(androidSshCurrentProjectId());
+    androidSshDialog.showModal();
+    if ($("androidSshProject").value)
+      $("androidSshAddress").focus();
+  });
+  function closeAndroidSshDialog() {
+    if (androidSshBusy) return;
+    androidSshDialog.close();
+    resetAndroidSshHostReview();
+  }
+  androidSshDialog.addEventListener("close", restoreAndroidSshStorageSettings);
+  $("androidSshClose").addEventListener("click", closeAndroidSshDialog);
+  $("androidSshCancel").addEventListener("click", closeAndroidSshDialog);
+  androidSshDialog.addEventListener("cancel", (event) => {
+    if (androidSshBusy) event.preventDefault();
+  });
+  $("androidSshProject").addEventListener("change", () => {
+    const projectId = androidSshCurrentProjectId();
+    renderAndroidSshProjects();
+    resetAndroidSshHostReview();
+    androidSshLoadLink(projectId);
+  });
+  for (const id of ["androidSshAddress", "androidSshHostPublicKey"])
+    $(id).addEventListener("input", resetAndroidSshHostReview);
+  $("androidSshManageProjects").addEventListener("click", () => {
+    if (nativeProjectMode) {
+      closeAndroidSshDialog();
+      showProjectCreateForm();
+      return;
+    }
+    const slot = $("androidSshStorageSlot");
+    const source = $("projectStorageSettings");
+    slot.append(source);
+    source.style.display = "block";
+    slot.classList.remove("hidden");
+    void refreshNativeProjectCatalog();
+    $("projectNativeEnable").focus({ preventScroll: true });
+  });
+  new MutationObserver(() => {
+    if (androidSshDialog.open && nativeProjectMode) {
+      renderAndroidSshProjects();
+      if (androidSshCurrentProjectId() && !$("androidSshAddress").value)
+        androidSshLoadLink(androidSshCurrentProjectId());
+    }
+  }).observe($("projectNativeStatus"), { childList: true, characterData: true, subtree: true });
+  $("androidSshGenerateKey").addEventListener("click", async () => {
+    const projectId = androidSshCurrentProjectId();
+    if (!projectId || !nativeAndroidRuntime || !isTauri()) return;
+    if (!$("androidSshKeyConsent").checked) {
+      $("androidSshStatus").textContent = "Confirm unencrypted app-private SSH key storage before generating a key.";
+      return;
+    }
+    androidSshSetBusy(true);
+    $("androidSshStatus").textContent = "Requesting project SSH identity from Android\u2026";
+    try {
+      const reply = await invoke(
+        "android_project_ssh_identity",
+        { projectId, confirmUnencryptedKeyStorage: true, userInitiated: true }
+      );
+      if (reply.projectId !== projectId || reply.privateKeyExported !== false || reply.privateKeyPassphraseProtected !== false || reply.remoteAuthorizationVerified !== false || !/^ssh-ed25519 [A-Za-z0-9+/]{68}(?: .*)?$/.test(reply.publicKey))
+        throw Error("SSH identity receipt did not match a verified project key.");
+      $("androidSshClientPublicKey").value = reply.publicKey;
+      $("androidSshStatus").textContent = "Project public key generated or loaded. Add it to the server authorized_keys yourself; server login has not been tested.";
+    } catch (error) {
+      $("androidSshStatus").textContent = "SSH identity unavailable: " + androidSshError(error);
+    } finally {
+      androidSshSetBusy(false);
+    }
+  });
+  $("androidSshCopyKey").addEventListener("click", async () => {
+    const key = $("androidSshClientPublicKey").value.trim();
+    if (!key) return;
+    try {
+      await navigator.clipboard.writeText(key);
+      $("androidSshStatus").textContent = "Project public key copied. Nothing has been sent to your server.";
+    } catch {
+      $("androidSshClientPublicKey").select();
+      $("androidSshStatus").textContent = "Select and copy the public key manually.";
+    }
+  });
+  $("androidSshPinHost").addEventListener("click", async () => {
+    const projectId = androidSshCurrentProjectId();
+    if (!projectId || !nativeAndroidRuntime || !isTauri()) return;
+    let address;
+    const key = $("androidSshHostPublicKey").value.trim();
+    try {
+      address = androidSshParseAddress();
+      const fingerprint = await androidSshHostFingerprint(key);
+      $("androidSshFingerprint").textContent = fingerprint;
+    } catch (error) {
+      $("androidSshStatus").textContent = androidSshError(error);
+      return;
+    }
+    if ($("androidSshHostKeyReview").classList.contains("hidden")) {
+      $("androidSshHostKeyReview").classList.remove("hidden");
+      $("androidSshStatus").textContent = "Compare the fingerprint against a trusted server record, tick the confirmation, then press Save again.";
+      return;
+    }
+    if (!$("androidSshTrustHost").checked) {
+      $("androidSshStatus").textContent = "Independent host fingerprint verification is required.";
+      return;
+    }
+    androidSshSetBusy(true);
+    try {
+      const reply = await invoke(
+        "android_project_ssh_pin",
+        {
+          projectId,
+          host: address.host,
+          port: address.port,
+          publicKey: key,
+          confirmedTrustedHostKey: true,
+          userInitiated: true
+        }
+      );
+      if (reply.projectId !== projectId || reply.host !== address.host || reply.port !== address.port || reply.pinned !== true || reply.replacedExistingPin !== false || reply.remoteHostVerifiedByApp !== false)
+        throw Error("SSH host pin was not verified by Android.");
+      $("androidSshStatus").textContent = "Trusted host key pinned in Android app-private known_hosts. Authentication has not been tested.";
+    } catch (error) {
+      $("androidSshStatus").textContent = "Host not pinned: " + androidSshError(error);
+    } finally {
+      androidSshSetBusy(false);
+    }
+  });
+  $("androidSshForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const projectId = androidSshCurrentProjectId();
+    if (!projectId || androidSshBusy || !nativeAndroidRuntime || !isTauri()) return;
+    let address;
+    let remoteDir;
+    try {
+      address = androidSshParseAddress();
+      remoteDir = androidSshRemoteFolder();
+    } catch (error) {
+      $("androidSshStatus").textContent = androidSshError(error);
+      return;
+    }
+    androidSshSetBusy(true);
+    $("androidSshStatus").textContent = "Testing an actual SSH connection and remote folder with strict host-key checking\u2026";
+    try {
+      const reply = await invoke(
+        "android_project_ssh_run",
+        {
+          projectId,
+          host: address.host,
+          port: address.port,
+          username: address.username,
+          action: "pwd",
+          remoteDir,
+          userInitiated: true
+        }
+      );
+      if (reply.projectId !== projectId || reply.host !== address.host || reply.port !== address.port || reply.hostKeyPolicy !== "strict-pinned" || reply.authenticationMethod !== "publickey-only" || reply.remoteDir !== remoteDir || reply.processStarted !== true || reply.completed !== true || reply.success !== true)
+        throw Error((reply.stderr || "SSH command did not verify the server folder").slice(0, 180));
+      const stored = saveAndroidSshLink(projectId, { ...address, remoteDir, verifiedAtMs: Date.now() });
+      if (!stored) throw Error("SSH connected but local project link could not be saved");
+      selectedProjectId = projectId;
+      renderThreads();
+      $("androidSshStatus").textContent = "SSH verified and project folder saved. Future access will recheck host and key.";
+      androidSshDialog.close();
+      announce("Remote SSH project verified and linked.", true);
+    } catch (error) {
+      $("androidSshStatus").textContent = "SSH project not linked: " + androidSshError(error);
+    } finally {
+      androidSshSetBusy(false);
+    }
+  });
   $("projectCancel").addEventListener("click", () => {
     pendingProjectFolderAfterCreate = false;
     editingProjectId = null;
@@ -2739,6 +3020,162 @@ ${preview.instructions.slice(0, 250)}`)) return;
     };
     document.head.append(script);
   }
+  var androidToolchainChecking = false;
+  async function checkAndroidInstalledRuntimes() {
+    if (!nativeAndroidRuntime) return;
+    const status = $("androidRuntimeStatus");
+    const button = $("androidRuntimeCheck");
+    if (androidToolchainChecking) return;
+    if (!isTauri()) {
+      status.textContent = "Preview mode cannot check Android executable files.";
+      return;
+    }
+    androidToolchainChecking = true;
+    button.disabled = true;
+    status.textContent = "Probing executable tools in this app\u2019s Android shell\u2026";
+    $("androidRuntimeResults").replaceChildren();
+    try {
+      const receipt = await invoke("android_pty_capabilities");
+      if (receipt?.supported !== true || receipt.kind !== "android-in-app-pty" || receipt.executionContext !== "app-uid-user-operated-shell")
+        throw Error("Native Android toolchain receipt is unavailable");
+      const tools = [
+        ["Node.js", receipt.node],
+        ["npm", receipt.npm],
+        ["OpenSSH", receipt.sshClient],
+        ["Git", receipt.git],
+        ["Python 3", receipt.python3]
+      ];
+      for (const [name, entry] of tools) {
+        const item = el("div", "android-runtime-tool");
+        const success = entry?.probeSucceeded === true;
+        item.dataset.ready = String(success);
+        item.append(
+          el("strong", "", name),
+          el("span", "", success ? "Executable verified" : "Not verified in app shell")
+        );
+        $("androidRuntimeResults").append(item);
+      }
+      status.textContent = receipt.nodeCodeExecutionProbeSucceeded === true && receipt.nodeNpmCliProbesSucceeded === true ? "Node code execution and npm CLI were verified inside this Android app. npm package installation is not tested." : "Node/npm execution is not verified inside this app. Termux has a separate Android UID and cannot silently supply its binaries.";
+      if (receipt.sshProjectTransportImplemented !== true)
+        status.textContent += " SSH project authentication has not been verified.";
+    } catch (error) {
+      status.textContent = "Could not verify native runtimes: " + String(error).slice(0, 170);
+    } finally {
+      androidToolchainChecking = false;
+      button.disabled = false;
+    }
+  }
+  $("androidRuntimeCheck").addEventListener("click", () => void checkAndroidInstalledRuntimes());
+  var termuxRunStatus = null;
+  var termuxRunBusy = false;
+  var termuxActions = {
+    node: [["version", "Check version"], ["check", "Check JavaScript syntax"], ["run", "Run a Termux JavaScript file"]],
+    npm: [["version", "Check version"], ["list", "List offline project packages"], ["install", "Offline install without lifecycle scripts"]],
+    ssh: [["version", "Check version"], ["test", "Test strict key-authenticated host"]]
+  };
+  function syncTermuxActionOptions() {
+    const tool = $("androidTermuxCommandTool").value;
+    const select = $("androidTermuxCommandAction");
+    const previous = select.value;
+    select.replaceChildren();
+    for (const [value, label] of termuxActions[tool] || []) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      select.append(option);
+    }
+    if ((termuxActions[tool] || []).some(([value]) => value === previous)) select.value = previous;
+    const action = select.value;
+    const projectNeeded = tool === "node" && action !== "version" || tool === "npm" && action !== "version";
+    $("androidTermuxProjectInputs").classList.toggle("hidden", !projectNeeded);
+    $("androidTermuxEntry").classList.toggle("hidden", tool !== "node" || action === "version");
+    $("androidTermuxEntry").previousElementSibling.classList.toggle("hidden", tool !== "node" || action === "version");
+    $("androidTermuxSshInputs").classList.toggle("hidden", tool !== "ssh" || action === "version");
+  }
+  function refreshTermuxRunButton() {
+    $("androidTermuxCommandRun").disabled = termuxRunBusy || !nativeAndroidRuntime || !isTauri() || termuxRunStatus?.runCommandPermissionGranted !== true || termuxRunStatus?.installed !== true || termuxRunStatus?.termuxResultSupported !== true || termuxRunStatus?.foreground !== true;
+  }
+  async function refreshTermuxRunStatus() {
+    if (!nativeAndroidRuntime || !isTauri()) return;
+    const status = $("androidTermuxCommandStatus");
+    try {
+      const reply = await invoke("android_termux_command_status");
+      if (reply.termuxExecutionContext !== "external-termux-app" || reply.termuxWorkspaceShared !== false || reply.userInitiatedRequired !== true || reply.maxConcurrency !== 1 || reply.maxOutputBytes !== 16384 || reply.maxWaitMs !== 3e4)
+        throw Error("Unexpected Termux command status");
+      termuxRunStatus = reply;
+      status.textContent = !reply.installed ? "Termux is not installed. Install it first." : !reply.termuxResultSupported ? "Installed Termux does not support verified command-result callbacks." : !reply.runCommandPermissionGranted ? "Android RUN_COMMAND permission not granted to Mcp Agent Ai." : !reply.foreground ? "Open Mcp Agent Ai in the foreground before running commands." : reply.running ? "Another Termux command is in progress." : "Termux is detected and Android RUN_COMMAND permission is granted. A separate on-device approval and a real Termux exit result are still required.";
+      if (!reply.allowExternalAppsVerified)
+        status.textContent += " Termux allow-external-apps is not independently verified; it may block the command.";
+    } catch (error) {
+      termuxRunStatus = null;
+      status.textContent = "Cannot verify the Termux command bridge: " + String(error).slice(0, 160);
+    } finally {
+      refreshTermuxRunButton();
+    }
+  }
+  syncTermuxActionOptions();
+  $("androidTermuxCommandTool").addEventListener("change", syncTermuxActionOptions);
+  $("androidTermuxCommandAction").addEventListener("change", syncTermuxActionOptions);
+  $("androidTermuxCommands").addEventListener("toggle", () => {
+    if ($("androidTermuxCommands").open) void refreshTermuxRunStatus();
+  });
+  $("androidTermuxCommandForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (termuxRunBusy || !nativeAndroidRuntime || !isTauri()) return;
+    const tool = $("androidTermuxCommandTool").value;
+    const action = $("androidTermuxCommandAction").value;
+    const project = $("androidTermuxProject").value.trim();
+    const entry = $("androidTermuxEntry").value.trim();
+    const host = $("androidTermuxSshHost").value.trim();
+    const username = $("androidTermuxSshUser").value.trim();
+    const port = Number($("androidTermuxSshPort").value);
+    if (!(termuxActions[tool] || []).some(([value]) => value === action)) return;
+    let params = {};
+    if (tool === "node" && ["check", "run"].includes(action)) {
+      if (!/^[a-z][a-z0-9_-]{0,39}$/.test(project) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}\.(js|mjs|cjs)$/.test(entry)) {
+        $("androidTermuxCommandStatus").textContent = "Node needs a Termux project slug and single JavaScript filename.";
+        return;
+      }
+      params = { project, entry };
+    }
+    if (tool === "npm" && ["list", "install"].includes(action)) {
+      if (!/^[a-z][a-z0-9_-]{0,39}$/.test(project)) {
+        $("androidTermuxCommandStatus").textContent = "npm needs a simple Termux project folder name.";
+        return;
+      }
+      params = { project };
+    }
+    if (tool === "ssh" && action === "test") {
+      if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(username) || !/^[A-Za-z0-9][A-Za-z0-9.-]{0,251}$/.test(host) || host.includes("..") || !host.split(".").every((part) => part.length > 0 && part.length <= 63 && /^[A-Za-z0-9]/.test(part) && /[A-Za-z0-9]$/.test(part)) || !Number.isInteger(port) || port < 1 || port > 65535) {
+        $("androidTermuxCommandStatus").textContent = "SSH needs a valid user, host and port; strict known_hosts checking is mandatory.";
+        return;
+      }
+      params = { host, username, port };
+    }
+    const description = `${tool} ${action}` + (params.project ? ` on Termux project ${params.project}` : "") + (params.host ? ` on ${params.host}:${params.port}` : "");
+    if (!window.confirm(`Request permission to run ${description}? This executes in the separate Termux app, not inside Mcp Agent Ai. Node and npm scripts may modify Termux files. Every command also requires Android approval.`)) return;
+    const requestId = crypto.randomUUID();
+    termuxRunBusy = true;
+    refreshTermuxRunButton();
+    $("androidTermuxCommandResult").textContent = "";
+    $("androidTermuxCommandStatus").textContent = "Waiting for a real Android Termux result\u2026";
+    let finalStatus = "";
+    try {
+      const reply = await invoke(
+        "android_termux_command_run",
+        { requestId, tool, action, ...params, userInitiated: true }
+      );
+      if (reply.requestId !== requestId || reply.tool !== tool || reply.action !== action || reply.processStarted !== true || reply.completed !== true || reply.resultVerified !== true || !Number.isInteger(reply.exitCode) || reply.success !== (reply.exitCode === 0) || reply.timedOut !== false || reply.termuxExecutionContext !== "external-termux-app" || reply.termuxWorkspaceShared !== false || typeof reply.stdout !== "string" || typeof reply.stderr !== "string") throw Error("Termux did not return a verified process exit result");
+      finalStatus = `Termux process finished with real exit code ${reply.exitCode}; ${reply.success ? "success" : "nonzero failure"}.`;
+      $("androidTermuxCommandResult").textContent = (reply.stdout + "\n" + reply.stderr).slice(0, 16384);
+    } catch (error) {
+      finalStatus = "No verified Termux execution: " + String(error).slice(0, 190);
+    } finally {
+      termuxRunBusy = false;
+      await refreshTermuxRunStatus();
+      if (finalStatus) $("androidTermuxCommandStatus").textContent = finalStatus;
+    }
+  });
   var termuxChecking = false;
   async function refreshAndroidTermux() {
     if (!nativeAndroidRuntime) return;
@@ -2767,7 +3204,11 @@ ${preview.instructions.slice(0, 250)}`)) return;
       $("androidTermuxRefresh").disabled = false;
     }
   }
-  $("androidTermuxRefresh").addEventListener("click", () => void refreshAndroidTermux());
+  $("androidTermuxRefresh").addEventListener("click", () => {
+    void refreshAndroidTermux();
+    if ($("androidTermuxCommands").open)
+      void refreshTermuxRunStatus();
+  });
   $("androidTermuxInstall").addEventListener("click", async () => {
     if (!nativeAndroidRuntime || !isTauri() || !window.confirm("Open the official F-Droid Termux installation page in Android? You decide whether to download and install; this app will not install anything automatically.")) return;
     $("androidTermuxInstall").disabled = true;
@@ -9570,6 +10011,9 @@ ${prompt}`;
       enabled: item.enabled,
       ready: item.ready,
       tools: item.tools,
+      installed: typeof item.installed === "boolean" ? item.installed : void 0,
+      installation: item.installation === "bundled_with_app" || item.installation === "external_unavailable" ? item.installation : void 0,
+      updateSupported: item.updateSupported === true,
       category,
       risk,
       version,
@@ -9664,10 +10108,12 @@ ${prompt}`;
     }
     for (const item of filtered) {
       const receipt = snapshot?.plugins.find((entry) => entry.id === item.id);
+      const installed = receipt?.installed ?? item.installed ?? true;
+      const bundled = receipt?.installation === "bundled_with_app" || item.installation === "bundled_with_app";
       const available = item.available && !!receipt?.available;
-      const enabled = available && receipt?.enabled === true;
+      const enabled = installed && available && receipt?.enabled === true;
       const ready = verified && available && enabled && receipt?.ready === true && receipt.tools > 0;
-      const label = !available ? "Unavailable" : !enabled ? "Off" : ready ? "Ready" : verified ? "Not ready" : "Waiting for ChatGPT";
+      const label = !installed ? "Not installed" : !available ? "Unavailable" : !enabled ? "Off" : ready ? "Ready" : verified ? "Not ready" : "Waiting for ChatGPT";
       const card = el("article", "android-plugins-module");
       card.dataset.pluginId = item.id;
       const category = androidPluginCategory(item);
@@ -9698,12 +10144,40 @@ ${prompt}`;
       tags.append(riskBadge);
       if (item.version) tags.append(el("span", "", "v" + item.version));
       title.append(tags);
+      const actions = el("div", "android-plugins-module-actions");
       const control = el("button", "outline android-plugins-toggle", enabled ? "Disable" : "Enable");
       control.type = "button";
-      control.disabled = androidPluginsBusy || !isTauri() || !available;
+      control.disabled = androidPluginsBusy || !isTauri() || !available || !installed;
       control.setAttribute("aria-label", `${enabled ? "Disable" : "Enable"} ${item.name}`);
       control.addEventListener("click", () => void toggleAndroidPlugin(item.id, !enabled));
-      card.append(title, control);
+      if (installed) actions.append(control);
+      if (bundled) {
+        const manage = el("button", "outline android-plugins-install", installed ? "Uninstall" : "Install");
+        manage.type = "button";
+        manage.disabled = androidPluginsBusy || !isTauri();
+        manage.setAttribute("aria-label", `${installed ? "Uninstall" : "Install"} bundled ${item.name}`);
+        manage.addEventListener("click", () => void changeAndroidPluginInstallation(item.id, !installed, item.name));
+        actions.append(manage);
+        const update = el("button", "outline android-plugins-check-update", "Check app update");
+        update.type = "button";
+        update.disabled = androidPluginsBusy || !isTauri();
+        update.setAttribute("aria-label", `Check official update for ${item.name}`);
+        update.addEventListener("click", () => void checkBundledAndroidPluginUpdate(item.id, item.name));
+        actions.append(update);
+        actions.append(el(
+          "small",
+          "android-plugins-update-note",
+          "Code is bundled in this APK; security updates arrive with a newer signed app version."
+        ));
+      }
+      if (!actions.children.length) {
+        actions.append(el(
+          "small",
+          "android-plugins-update-note",
+          "External plugin installation is unavailable until package verification is supported."
+        ));
+      }
+      card.append(title, actions);
       const details = el("details", "android-plugins-module-details");
       details.append(el("summary", "", "Capabilities & permissions"));
       const permissionText = item.permissions?.length ? item.permissions.join(" \xB7 ") : category === "automation" ? "Requires separate Android runtime consent and app-session checks" : risk === "read_only" ? "Bounded read-only inputs, no local filesystem or shell access" : "Native permission required before using actions";
@@ -9766,6 +10240,63 @@ ${prompt}`;
       androidPluginsBusy = false;
       renderAndroidPlugins();
       void refreshAndroidPlugins(true);
+    }
+  }
+  async function changeAndroidPluginInstallation(pluginId, install, name) {
+    if (!nativeAndroidRuntime || !isTauri() || androidPluginsBusy) return;
+    const original = androidPluginsStatus?.plugins.find((plugin) => plugin.id === pluginId);
+    const bundled = original?.installation === "bundled_with_app";
+    if (!bundled || original?.installed === install) return;
+    const action = install ? "Install" : "Uninstall";
+    if (!window.confirm(install ? `Install bundled ${name} into the Android tool catalog? It will stay disabled until you enable it.` : `Uninstall ${name} from the Android tool catalog? Its published tool aliases will be revoked; the compiled code remains in this APK.`)) return;
+    androidPluginsBusy = true;
+    ++androidPluginsGeneration;
+    androidPluginsModuleMessage = `${action}ing ${name}\u2026`;
+    renderAndroidPlugins();
+    try {
+      const cmd = install ? "android_plugins_install_bundled" : "android_plugins_uninstall_bundled";
+      const next = androidPluginsReceipt(await invoke(cmd, { pluginId, userInitiated: true }));
+      const changed = next.plugins.find((plugin) => plugin.id === pluginId);
+      if (!changed || changed.installed !== install)
+        throw Error("Installation state was not verified");
+      androidPluginsStatus = next;
+      androidPluginsModuleMessage = `${name}: ${install ? "installed, disabled by default" : "uninstalled and aliases revoked"}.`;
+    } catch (error) {
+      androidPluginsModuleMessage = `${action} not verified: ${String(error).slice(0, 120)}`;
+    } finally {
+      androidPluginsBusy = false;
+      await refreshAndroidPlugins(true);
+      renderAndroidPlugins();
+    }
+  }
+  async function checkBundledAndroidPluginUpdate(pluginId, name) {
+    if (!nativeAndroidRuntime || !isTauri() || androidPluginsBusy) return;
+    const item = androidPluginsStatus?.plugins.find((plugin) => plugin.id === pluginId);
+    if (!item?.installed || item.installation !== "bundled_with_app") return;
+    androidPluginsBusy = true;
+    androidPluginsModuleMessage = `Checking the official signed-app release for ${name}\u2026`;
+    renderAndroidPlugins();
+    try {
+      const receipt = await invoke(
+        "android_plugins_check_update",
+        { pluginId, userInitiated: true }
+      );
+      if (receipt.pluginId !== pluginId || typeof receipt.checkSucceeded !== "boolean" || receipt.automaticInstallSupported !== false || receipt.signingCompatibilityVerified !== false)
+        throw Error("Native update metadata receipt was not verified");
+      if (!receipt.checkSucceeded) {
+        androidPluginsModuleMessage = `${name}: official update check unavailable (${String(receipt.reason || "no release").slice(0, 70)}).`;
+      } else if (receipt.updateAvailable === true && typeof receipt.version === "string") {
+        const url = typeof receipt.url === "string" ? receipt.url : "";
+        const trusted = /^https:\/\/github\.com\/airesz178\/Mcp-Agent-Ai\/releases\/tag\/[A-Za-z0-9._-]{1,80}$/.test(url);
+        androidPluginsModuleMessage = `${name}: app release ${receipt.version} may be newer. ` + (trusted ? `Release page: ${url}. ` : "") + "Android must verify APK signature compatibility before updating; no installation was started.";
+      } else {
+        androidPluginsModuleMessage = `${name}: no newer stable signed-app release reported by GitHub. No update installed.`;
+      }
+    } catch (error) {
+      androidPluginsModuleMessage = `Official update check not verified: ${String(error).slice(0, 110)}`;
+    } finally {
+      androidPluginsBusy = false;
+      renderAndroidPlugins();
     }
   }
   if (nativeAndroidRuntime) {

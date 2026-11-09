@@ -1,8 +1,8 @@
 //! Android Plugins catalog and verified runtime tool registry.
 //!
-//! This is a *separate Plugins surface*, not the Core OpenAI tunnel. A tunnel
-//! ID is configuration only: neither an enabled switch nor an ID proves that
-//! an OpenAI tunnel is paired, connected, or capable of accepting tool calls.
+//! This maintains separate Plugins module settings on the existing shared Core
+//! MCP tunnel. A saved ID or enabled switch is configuration only: neither
+//! proves that the Core tunnel is connected or accepting tool calls.
 //! No network connection, tool execution, or readiness probing happens when
 //! a plugin is registered, enabled, or restored from saved configuration.
 //!
@@ -16,7 +16,7 @@
 use crate::{local_agent_tools, mcp_client};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -65,6 +65,12 @@ pub struct PluginStatus {
     pub name: String,
     pub source: PluginSource,
     pub enabled: bool,
+    /// Whether an app-bundled module is currently registered for use. The
+    /// code itself ships inside the APK and is never downloaded dynamically.
+    /// An external MCP descriptor does not constitute an installed bundle.
+    pub installed: bool,
+    pub installation: &'static str,
+    pub update_supported: bool,
     /// Native: capabilities published after a supported OS probe, including
     /// actions which are temporarily unavailable in the current OS state.
     /// Remote: definitions from the verified live MCP session.
@@ -74,8 +80,8 @@ pub struct PluginStatus {
     /// Remote: currently bound MCP definitions (unchanged behavior).
     pub ready_tool_count: usize,
     pub tools_available: bool,
-    /// Separately managed OpenAI Plugins tunnel is NEVER proven by this
-    /// catalog. Prime's tunnel owner must report its real authenticated state.
+    /// Core tunnel authentication is NEVER proven by this catalog. The tunnel
+    /// owner separately reports its actual authenticated live state.
     pub plugins_tunnel_verified: bool,
     pub state: &'static str,
     pub category: &'static str,
@@ -103,14 +109,25 @@ struct ConfigV1 {
     plugins: Vec<PluginSpec>,
 }
 
-/// Version 2 persists only native alias identities, never a live tool binding,
-/// readiness/OS permission, a pending request, or an approval grant.
+/// Version 2 persists native alias identities and optional bundled-module
+/// uninstall tombstones, never a live tool binding, OS permission, pending
+/// request, or approval grant.
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ConfigV2 {
     version: u8,
     plugins: Vec<PluginSpec>,
     native_generations: BTreeMap<String, String>,
+    /// Tombstones for user-uninstalled compiled modules. Their code remains
+    /// part of the APK, but their tools are never rebound or advertised.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    bundled_uninstalled: Vec<String>,
+}
+
+/// This is a manifest of capabilities already compiled into the signed APK.
+/// It is deliberately not a network marketplace or arbitrary archive loader.
+fn is_bundled_id(id: &str) -> bool {
+    matches!(id, "browser" | "app_control" | "security_audit" | "reverse_engineering")
 }
 
 enum RuntimeBinding {
@@ -302,6 +319,7 @@ fn native_tool_names(source: &PluginSource, receipt: &Value) -> Result<Vec<Strin
 #[derive(Default)]
 pub struct AndroidPluginRegistry {
     plugins: Vec<Entry>,
+    bundled_uninstalled: BTreeSet<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -357,16 +375,16 @@ impl AndroidPluginRegistry {
         }
         let envelope: Value =
             serde_json::from_str(raw).map_err(|_| "Invalid Android plugin catalog config")?;
-        let (plugins, generations) = match envelope["version"].as_u64() {
+        let (plugins, generations, uninstalled) = match envelope["version"].as_u64() {
             Some(1) => {
                 let v1: ConfigV1 = serde_json::from_value(envelope)
                     .map_err(|_| "Invalid Android plugin v1 catalog config")?;
-                (v1.plugins, None)
+                (v1.plugins, None, Vec::new())
             }
             Some(2) => {
                 let v2: ConfigV2 = serde_json::from_value(envelope)
                     .map_err(|_| "Invalid Android plugin v2 catalog config")?;
-                (v2.plugins, Some(v2.native_generations))
+                (v2.plugins, Some(v2.native_generations), v2.bundled_uninstalled)
             }
             _ => return Err("Unsupported plugin catalog version or capacity".into()),
         };
@@ -375,6 +393,21 @@ impl AndroidPluginRegistry {
         }
         let mut registry = Self::new();
         for plugin in plugins {
+            // The persisted file is not an authority to invent native modules
+            // or impersonate a compiled ID with a remote MCP source. Keep the
+            // generic add_plugin helper for isolated tests, but restore only
+            // the four genuine module identities shipped in the APK.
+            let canonical = match plugin.source {
+                PluginSource::NativeBrowser => plugin.id == "browser",
+                PluginSource::NativeApp => plugin.id == "app_control",
+                PluginSource::NativeSecurityAudit => plugin.id == "security_audit",
+                PluginSource::NativeReverseEngineering =>
+                    plugin.id == "reverse_engineering",
+                PluginSource::RemoteMcp { .. } => !is_bundled_id(&plugin.id),
+            };
+            if !canonical {
+                return Err("Saved plugin cannot impersonate bundled Android code".into());
+            }
             registry.add_plugin(plugin)?;
         }
         if let Some(mut generations) = generations {
@@ -404,6 +437,24 @@ impl AndroidPluginRegistry {
         // Existing known native identities were validated above; missing new
         // modules get fresh UUIDs that are persisted before tools/list.
         registry.add_curated_builtins()?;
+        // Tombstones cannot carry enabled authority or name arbitrary
+        // external/remote entries. Reject duplicates and forged IDs rather
+        // than silently repairing an untrusted saved catalog.
+        let mut seen = BTreeSet::new();
+        for id in uninstalled {
+            if !is_bundled_id(&id) || !seen.insert(id.clone()) {
+                return Err("Invalid uninstalled Android bundled module".into());
+            }
+            let entry = registry.entry(&id)?;
+            if !matches!(
+                entry.spec.source,
+                PluginSource::NativeBrowser | PluginSource::NativeApp
+                | PluginSource::NativeSecurityAudit | PluginSource::NativeReverseEngineering
+            ) || entry.spec.enabled {
+                return Err("Uninstalled bundled module cannot be enabled".into());
+            }
+        }
+        registry.bundled_uninstalled = seen;
         Ok(registry)
     }
 
@@ -429,6 +480,7 @@ impl AndroidPluginRegistry {
                 })
                 .map(|entry| (entry.spec.id.clone(), entry.generation.to_string()))
                 .collect(),
+            bundled_uninstalled: self.bundled_uninstalled.iter().cloned().collect(),
         };
         let result = serde_json::to_string(&config)
             .map_err(|_| "Cannot serialize Android plugin catalog")?;
@@ -466,6 +518,9 @@ impl AndroidPluginRegistry {
     }
 
     pub fn set_enabled(&mut self, id: &str, enabled: bool) -> Result<(), String> {
+        if self.bundled_uninstalled.contains(id) {
+            return Err("Install the bundled module before enabling it".into());
+        }
         let entry = self.entry_mut(id)?;
         if entry.spec.enabled != enabled {
             entry.revoke(); // re-enabling requires a fresh, real verification
@@ -474,7 +529,65 @@ impl AndroidPluginRegistry {
         Ok(())
     }
 
+    /// Register a module that is already compiled into this APK. There is no
+    /// third-party code loading or implicit Enable on installation.
+    pub fn install_bundled(&mut self, id: &str) -> Result<(), String> {
+        if !is_bundled_id(id) {
+            return Err("External plugin bundle installation is unsupported".into());
+        }
+        let entry = self.entry(id)?;
+        if !matches!(
+            entry.spec.source,
+            PluginSource::NativeBrowser | PluginSource::NativeApp
+            | PluginSource::NativeSecurityAudit | PluginSource::NativeReverseEngineering
+        ) {
+            return Err("Plugin does not match a compiled Android module".into());
+        }
+        if self.bundled_uninstalled.remove(id) {
+            let entry = self.entry_mut(id)?;
+            entry.revoke();
+            entry.spec.enabled = false;
+        }
+        Ok(())
+    }
+
+    /// Unregister a bundled module. Revocation invalidates all its published
+    /// aliases; the APK's immutable code cannot be removed independently.
+    pub fn uninstall_bundled(&mut self, id: &str) -> Result<(), String> {
+        if !is_bundled_id(id) {
+            return Err("External plugin bundle uninstall is unsupported".into());
+        }
+        let already_uninstalled = self.bundled_uninstalled.contains(id);
+        let entry = self.entry_mut(id)?;
+        if !matches!(
+            entry.spec.source,
+            PluginSource::NativeBrowser | PluginSource::NativeApp
+            | PluginSource::NativeSecurityAudit | PluginSource::NativeReverseEngineering
+        ) {
+            return Err("Plugin does not match a compiled Android module".into());
+        }
+        if !already_uninstalled {
+            entry.revoke();
+            entry.spec.enabled = false;
+            self.bundled_uninstalled.insert(id.to_owned());
+        }
+        Ok(())
+    }
+
+    /// Versioned native code can only be upgraded in a signed app update.
+    /// Returning a fake successful update would misrepresent installed code.
+    pub fn check_bundled_update(&self, id: &str) -> Result<(), String> {
+        if !is_bundled_id(id) {
+            return Err("Third-party plugin updates are unsupported".into());
+        }
+        self.entry(id)?;
+        Err("Bundled plugin updates require a signed Mcp Agent Ai APK update".into())
+    }
+
     pub fn remove_plugin(&mut self, id: &str) -> Result<(), String> {
+        if is_bundled_id(id) {
+            return self.uninstall_bundled(id);
+        }
         let position = self
             .plugins
             .iter()
@@ -642,11 +755,21 @@ impl AndroidPluginRegistry {
                     name: entry.spec.name.clone(),
                     source: entry.spec.source.clone(),
                     enabled: entry.spec.enabled,
+                    installed: is_bundled_id(&entry.spec.id)
+                        && !self.bundled_uninstalled.contains(&entry.spec.id),
+                    installation: if is_bundled_id(&entry.spec.id) {
+                        "bundled_with_app"
+                    } else {
+                        "external_unavailable"
+                    },
+                    update_supported: false,
                     verified_tool_count: count,
                     ready_tool_count: ready_count,
                     tools_available: count > 0,
                     plugins_tunnel_verified: false,
-                    state: if !entry.spec.enabled {
+                    state: if self.bundled_uninstalled.contains(&entry.spec.id) {
+                        "not_installed"
+                    } else if !entry.spec.enabled {
                         "disabled"
                     } else if count > 0 {
                         match entry.spec.source {
@@ -965,6 +1088,95 @@ mod tests {
         registry.verify_native("security_audit",host).await.unwrap();
         assert_ne!(alias_of(&registry,"security_audit_analyze"),audit_alias);
         assert!(registry.execute_tool(&audit_alias,json!({"text":"ok"})).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn bundled_uninstall_reinstall_persists_disabled_state_and_revokes_old_alias() {
+        let mut catalog = AndroidPluginRegistry::with_builtins();
+        catalog.set_enabled("security_audit", true).unwrap();
+        catalog.verify_native("security_audit", Arc::new(CompiledCuratedHost))
+            .await.unwrap();
+        let previous = alias_of(&catalog, "security_audit_analyze");
+        assert_eq!(catalog.list().iter().find(|p|p.id=="security_audit").unwrap().installed,true);
+
+        // Uninstall unregisters the bundled tools, even though immutable code
+        // still exists inside the APK; old aliases become invalid immediately.
+        catalog.uninstall_bundled("security_audit").unwrap();
+        let item = catalog.list().into_iter().find(|p|p.id=="security_audit").unwrap();
+        assert!(!item.installed);
+        assert!(!item.enabled);
+        assert_eq!(item.state,"not_installed");
+        assert_eq!(item.verified_tool_count,0);
+        assert!(catalog.inspect_tool(&previous,&json!({"text":"ok"})).is_err());
+        assert!(catalog.set_enabled("security_audit",true).is_err());
+        let saved = catalog.export_config().unwrap();
+        let encoded:Value = serde_json::from_str(&saved).unwrap();
+        assert_eq!(encoded["bundledUninstalled"],json!(["security_audit"]));
+
+        let mut rebooted = AndroidPluginRegistry::from_config(&saved).unwrap();
+        assert!(rebooted.tools_list().is_empty());
+        assert!(!rebooted.list().iter().find(|p|p.id=="security_audit").unwrap().installed);
+        assert!(rebooted.set_enabled("security_audit",true).is_err());
+
+        // Re-registering bundled code never implicitly enables it. The prior
+        // tool alias cannot be reused, even after a fresh live host probe.
+        rebooted.install_bundled("security_audit").unwrap();
+        assert!(rebooted.list().iter().find(|p|p.id=="security_audit").unwrap().installed);
+        assert!(!rebooted.list().iter().find(|p|p.id=="security_audit").unwrap().enabled);
+        assert!(rebooted.tools_list().is_empty());
+        rebooted.set_enabled("security_audit",true).unwrap();
+        rebooted.verify_native("security_audit",Arc::new(CompiledCuratedHost))
+            .await.unwrap();
+        assert_ne!(alias_of(&rebooted,"security_audit_analyze"),previous);
+        assert!(rebooted.inspect_tool(&previous,&json!({"text":"ok"})).is_err());
+        let restored = AndroidPluginRegistry::from_config(&rebooted.export_config().unwrap())
+            .unwrap();
+        assert!(restored.list().iter().find(|p|p.id=="security_audit").unwrap().installed);
+        assert!(restored.list().iter().find(|p|p.id=="security_audit").unwrap().enabled);
+        assert!(restored.tools_list().is_empty());
+    }
+
+    #[test]
+    fn bundle_policy_rejects_external_install_update_and_tampered_tombstones() {
+        let mut registry = AndroidPluginRegistry::with_builtins();
+        let saved=registry.export_config().unwrap();
+        assert!(registry.install_bundled("third_party_package").is_err());
+        assert!(registry.uninstall_bundled("third_party_package").is_err());
+        assert!(registry.check_bundled_update("security_audit").is_err());
+        assert!(registry.check_bundled_update("third_party_package").is_err());
+        assert_eq!(registry.export_config().unwrap(), saved);
+
+        registry.remove_plugin("browser").unwrap();
+        assert!(!registry.list().iter().find(|p|p.id=="browser").unwrap().installed);
+        assert_eq!(registry.list().len(),4,
+            "Remove of a compiled module must persist a tombstone, not erase its identity");
+        let valid:Value=serde_json::from_str(&registry.export_config().unwrap()).unwrap();
+        for invalid in [
+            json!(["random_external"]),
+            json!(["browser","browser"]),
+            json!(["security_audit","remote_unsafe"])
+        ] {
+            let mut tampered=valid.clone();
+            tampered["bundledUninstalled"]=invalid;
+            assert!(AndroidPluginRegistry::from_config(&tampered.to_string()).is_err());
+        }
+        let mut installed_and_enabled=valid;
+        installed_and_enabled["plugins"][0]["enabled"]=json!(true);
+        assert!(AndroidPluginRegistry::from_config(&installed_and_enabled.to_string()).is_err());
+
+        // A forged saved catalog must never claim that remote MCP is the
+        // bundled browser, or that an arbitrary slug is a new native module.
+        let spoof_remote=json!({"version":1,"plugins":[{
+            "id":"browser","name":"Fake browser",
+            "source":{"kind":"remote_mcp","tunnel_id":"plugins_external_123"},
+            "enabled":true
+        }]});
+        assert!(AndroidPluginRegistry::from_config(&spoof_remote.to_string()).is_err());
+        let spoof_native=json!({"version":1,"plugins":[{
+            "id":"untrusted_extra","name":"Fake native app",
+            "source":{"kind":"native_app"},"enabled":true
+        }]});
+        assert!(AndroidPluginRegistry::from_config(&spoof_native.to_string()).is_err());
     }
 
     #[test]

@@ -10,6 +10,7 @@ use crate::android_openai_tunnel::{AndroidOpenAiTunnel, PluginRpcHandler, RpcRep
 use mcp_agent_core::android_plugin_registry::{
     execute_curated_host_tool, AndroidLocalToolHost, AndroidPluginRegistry, PluginSource, PluginToolInfo,
 };
+use reqwest::{header, redirect, Client, Url};
 use serde_json::{json, Value};
 use std::{
     fs,
@@ -30,6 +31,189 @@ const APP_SESSION_MAX_AGE: Duration = Duration::from_secs(60 * 60);
 const CONNECTOR_NAME: &str = "Mcp Agent Ai Core";
 const CONNECTOR_DESCRIPTION: &str =
     "Optional verified Android plugin tools shared through the Mcp Agent Ai Core tunnel.";
+// Official public release metadata only. This URL is fixed in the compiled
+// application: callers cannot supply an endpoint or redirect to another host.
+const GITHUB_LATEST_RELEASE_API: &str =
+    "https://api.github.com/repos/airesz178/Mcp-Agent-Ai/releases/latest";
+const GITHUB_RELEASE_REPOSITORY: &str = "airesz178/Mcp-Agent-Ai";
+const OFFICIAL_ANDROID_APK_NAME: &str = "Mcp-Agent-Ai-Android.apk";
+const RELEASE_RESPONSE_LIMIT: usize = 128 * 1024;
+const RELEASE_ASSET_COUNT_LIMIT: usize = 64;
+const RELEASE_APK_MAX_SIZE: u64 = 2 * 1024 * 1024 * 1024;
+const RELEASE_CHECK_TIMEOUT: Duration = Duration::from_secs(12);
+
+fn bundled_update_target(id: &str) -> bool {
+    matches!(id, "browser" | "app_control" | "security_audit" | "reverse_engineering")
+}
+
+fn release_version(value: &str) -> Option<(u32,u32,u32)> {
+    let trimmed = value.strip_prefix('v').unwrap_or(value);
+    if trimmed.len() > 32 { return None; }
+    let components = trimmed.split('.').collect::<Vec<_>>();
+    if components.len() != 3 { return None; }
+    let parse = |part:&str| {
+        (part.len() <= 10 && !part.is_empty()
+            && (part.len()==1 || !part.starts_with('0'))
+            && part.bytes().all(|b|b.is_ascii_digit()))
+            .then(||part.parse::<u32>().ok()).flatten()
+    };
+    Some((parse(components[0])?,parse(components[1])?,parse(components[2])?))
+}
+
+fn official_github_release_url(raw: &str, tag: &str) -> Option<String> {
+    let parsed = Url::parse(raw).ok()?;
+    let expected_path = format!("/airesz178/Mcp-Agent-Ai/releases/tag/{tag}");
+    (parsed.scheme()=="https"
+        && parsed.host_str()==Some("github.com")
+        && parsed.port().is_none()
+        && parsed.username().is_empty() && parsed.password().is_none()
+        && parsed.query().is_none() && parsed.fragment().is_none()
+        && parsed.path()==expected_path).then(||parsed.into())
+}
+
+fn official_github_asset_url(raw: &str, tag: &str) -> bool {
+    let Ok(parsed)=Url::parse(raw) else {return false;};
+    parsed.scheme()=="https" && parsed.host_str()==Some("github.com")
+        && parsed.port().is_none()
+        && parsed.username().is_empty() && parsed.password().is_none()
+        && parsed.query().is_none() && parsed.fragment().is_none()
+        && parsed.path()==format!(
+            "/airesz178/Mcp-Agent-Ai/releases/download/{tag}/{OFFICIAL_ANDROID_APK_NAME}")
+}
+
+fn github_asset_sha256(raw: &str) -> Option<String> {
+    let bytes=raw.strip_prefix("sha256:")?.as_bytes();
+    (bytes.len()==64 && bytes.iter().all(u8::is_ascii_hexdigit))
+        .then(||format!("sha256:{}", raw[7..].to_ascii_lowercase()))
+}
+
+fn release_check_failure(id:&str, reason:&str) -> Value {
+    json!({"pluginId":id,"checkSucceeded":false,"updateAvailable":false,
+        "version":null,"url":null,"assetName":null,"assetDigest":null,
+        "installedVersion":env!("CARGO_PKG_VERSION"),
+        "repository":GITHUB_RELEASE_REPOSITORY,
+        "reason":reason,"automaticInstallSupported":false,
+        "signingCompatibilityVerified":false})
+}
+
+fn append_release_chunk(body:&mut Vec<u8>, chunk:&[u8]) -> bool {
+    if chunk.len()>RELEASE_RESPONSE_LIMIT.saturating_sub(body.len()) {
+        return false;
+    }
+    body.extend_from_slice(chunk);
+    true
+}
+
+/// Parse a single bounded GitHub Releases API response. The GitHub-provided
+/// SHA-256 is metadata, not an independently verified APK digest or signature.
+/// Without a matching uploaded APK and its valid digest, do not call it an
+/// actionable app update even when a newer release tag exists.
+fn parse_official_release(id:&str, release:&Value) -> Result<Value,&'static str> {
+    if release["draft"]!=false || release["prerelease"]!=false {
+        return Err("non_stable_release");
+    }
+    let tag=release["tag_name"].as_str().ok_or("invalid_release_version")?;
+    let latest=release_version(tag).ok_or("invalid_release_version")?;
+    let current=release_version(env!("CARGO_PKG_VERSION"))
+        .ok_or("invalid_installed_app_version")?;
+    let page=release["html_url"].as_str()
+        .and_then(|url|official_github_release_url(url,tag))
+        .ok_or("invalid_release_url")?;
+    let assets=release["assets"].as_array().ok_or("invalid_release_assets")?;
+    if assets.len()>RELEASE_ASSET_COUNT_LIMIT {
+        return Err("release_asset_limit_exceeded");
+    }
+    let mut apk:Option<(String,u64,Option<String>)>=None;
+    for item in assets {
+        if item["name"].as_str()!=Some(OFFICIAL_ANDROID_APK_NAME) {continue;}
+        if apk.is_some() {return Err("ambiguous_android_apk_asset");}
+        if item["state"]!="uploaded" {
+            return Err("android_apk_not_uploaded");
+        }
+        let size=item["size"].as_u64().filter(|size|
+            (1..=RELEASE_APK_MAX_SIZE).contains(size))
+            .ok_or("invalid_android_apk_size")?;
+        let url=item["browser_download_url"].as_str()
+            .filter(|url|official_github_asset_url(url,tag))
+            .ok_or("invalid_android_apk_url")?;
+        let digest=match item["digest"].as_str() {
+            Some(raw)=>Some(github_asset_sha256(raw).ok_or("invalid_android_apk_digest")?),
+            None=>None,
+        };
+        apk=Some((url.to_owned(),size,digest));
+    }
+    let newer=latest>current;
+    let safe_asset=apk.as_ref().is_some_and(|(_,_,digest)|digest.is_some());
+    let reason=if !newer { "already_current_or_newer" }
+        else if apk.is_none() { "android_apk_asset_missing" }
+        else if !safe_asset { "android_apk_digest_missing" }
+        else { "newer_official_apk_found" };
+    Ok(json!({"pluginId":id,"checkSucceeded":true,
+        "updateAvailable":newer && safe_asset,
+        "version":tag.strip_prefix('v').unwrap_or(tag),
+        "url":page,"assetName":apk.as_ref().map(|_|OFFICIAL_ANDROID_APK_NAME),
+        "assetDigest":apk.as_ref().and_then(|(_,_,digest)|digest.as_deref()),
+        "assetSizeBytes":apk.as_ref().map(|(_,size,_)|size),
+        "assetUrl":apk.as_ref().map(|(url,_,_)|url.as_str()),
+        "assetDigestSource":"github_release_metadata",
+        "installedVersion":env!("CARGO_PKG_VERSION"),
+        "repository":GITHUB_RELEASE_REPOSITORY,"reason":reason,
+        "automaticInstallSupported":false,
+        "signingCompatibilityVerified":false}))
+}
+
+/// One user-requested GET, no tokens, no proxy, no redirects and no APK
+/// transfer. A slow or malformed server can consume at most 128 KiB of body.
+async fn fetch_official_release_check(id:&str) -> Value {
+    let client=match Client::builder().https_only(true).no_proxy()
+        .redirect(redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(4))
+        .timeout(RELEASE_CHECK_TIMEOUT).build() {
+        Ok(client)=>client,
+        Err(_)=>return release_check_failure(id,"https_client_unavailable"),
+    };
+    let request=client.get(GITHUB_LATEST_RELEASE_API)
+        .header(header::ACCEPT,"application/vnd.github+json")
+        .header(header::USER_AGENT,"Mcp-Agent-Ai-Android-Release-Check")
+        .header(header::CACHE_CONTROL,"no-cache")
+        .header(header::ACCEPT_ENCODING,"identity");
+    let mut response=match request.send().await {
+        Ok(result)=>result,
+        Err(_)=>return release_check_failure(id,"network_unavailable"),
+    };
+    if response.status()==reqwest::StatusCode::NOT_FOUND {
+        return release_check_failure(id,"no_published_release");
+    }
+    if response.status()==reqwest::StatusCode::FORBIDDEN
+        || response.status()==reqwest::StatusCode::TOO_MANY_REQUESTS {
+        return release_check_failure(id,"github_rate_limited_or_forbidden");
+    }
+    if response.status()!=reqwest::StatusCode::OK {
+        return release_check_failure(id,"github_release_unavailable");
+    }
+    if response.content_length().is_some_and(|size|size>RELEASE_RESPONSE_LIMIT as u64) {
+        return release_check_failure(id,"release_response_too_large");
+    }
+    let mut body=Vec::new();
+    loop {
+        let chunk=match response.chunk().await {
+            Ok(Some(bytes))=>bytes,
+            Ok(None)=>break,
+            Err(_)=>return release_check_failure(id,"network_unavailable"),
+        };
+        if !append_release_chunk(&mut body,&chunk) {
+            return release_check_failure(id,"release_response_too_large");
+        }
+    }
+    let release:Value=match serde_json::from_slice(&body) {
+        Ok(value)=>value,
+        Err(_)=>return release_check_failure(id,"invalid_release_metadata"),
+    };
+    match parse_official_release(id,&release) {
+        Ok(receipt)=>receipt,
+        Err(reason)=>release_check_failure(id,reason),
+    }
+}
 
 /// Keeps Android browser/app behavior in the existing host and executes only
 /// two fixed, side-effect-free bundled tools in native-core. No APK parsing,
@@ -368,6 +552,26 @@ fn persist_catalog(path: &Path, content: &str) -> Result<(), String> {
     outcome.map_err(str::to_owned)
 }
 
+/// Commit a complete, validated catalog before publishing new in-memory
+/// aliases or installation state. A failed disk write leaves the old in-memory
+/// configuration unchanged, so neither success nor revocation is invented.
+fn change_persisted_catalog(
+    registry: &Arc<Mutex<AndroidPluginRegistry>>,
+    path: &Path,
+    mutation: impl FnOnce(&mut AndroidPluginRegistry) -> Result<(), String>,
+) -> Result<(), String> {
+    let mut locked = registry.lock().map_err(|_| "Plugin catalog unavailable")?;
+    let prior = locked.export_config()?;
+    let mut next = AndroidPluginRegistry::from_config(&prior)?;
+    mutation(&mut next)?;
+    let updated = next.export_config()?;
+    if updated != prior {
+        persist_catalog(path, &updated)?;
+        *locked = next;
+    }
+    Ok(())
+}
+
 fn rpc_error(id: Value,code:i64, message:&'static str)->RpcReply {
     RpcReply {payload:Some(json!({"jsonrpc":"2.0","id":id,
         "error":{"code":code,"message":message}})),successful_tool_call:false}
@@ -675,6 +879,8 @@ impl AndroidPluginsRuntime {
                 else {"Verified remote MCP tools"},
                 "enabled":p["enabled"]==true,"ready":count>0 && p["toolsAvailable"]==true,
                 "available":matches!(id,"browser"|"app_control"|"security_audit"|"reverse_engineering"),
+                "installed":p["installed"]==true,"installation":p["installation"],
+                "updateSupported":p["updateSupported"]==true,
                 "tools":count,"state":p["state"],"category":p["category"],
                 "version":p["version"],"risk":p["risk"],"sourceLabel":p["sourceLabel"],
                 "permissions":p["permissions"],"toolNames":p["toolNames"]})
@@ -695,21 +901,21 @@ impl AndroidPluginsRuntime {
         if !matches!(id,"browser"|"app_control"|"security_audit"|"reverse_engineering") {
             return Err("Plugin cannot be enabled from this build".into());
         }
-        if !enabled {
-            if id=="app_control" {clear_app_session(&self.app_session_grant);}
-            // Disabling a native module cannot keep a live app-control grant.
+        change_persisted_catalog(&self.registry,&self.config_path,
+            |next|next.set_enabled(id,enabled))?;
+        if !enabled && id=="app_control" {clear_app_session(&self.app_session_grant);}
+        Ok(())
+    }
+
+    fn change_bundled_installation(&self,id:&str,install:bool)->Result<(),String>{
+        if !matches!(id,"browser"|"app_control"|"security_audit"|"reverse_engineering") {
+            return Err("Third-party plugin bundle installation is unsupported".into());
         }
-        let mut locked=self.registry.lock().map_err(|_|"Plugin catalog unavailable")?;
-        locked.set_enabled(id,enabled)?;
-        let after=locked.export_config()?;
-        if let Err(error)=persist_catalog(&self.config_path,&after){
-            // A failed write cannot resurrect a revoked native alias by
-            // restoring the previous in-memory generation. Keep the new
-            // disabled/enabled preference pending in RAM with runtime proof
-            // cleared, and retry persistence before any future tools/list.
-            *locked=AndroidPluginRegistry::from_config(&after)?;
-            return Err(error);
-        }
+        change_persisted_catalog(&self.registry,&self.config_path,|next| {
+            if install { next.install_bundled(id) }
+            else { next.uninstall_bundled(id) }
+        })?;
+        if !install && id=="app_control" {clear_app_session(&self.app_session_grant);}
         Ok(())
     }
 }
@@ -748,10 +954,206 @@ pub async fn android_plugins_set_enabled(
     }).await.map_err(|_|"Android plugin configuration interrupted".to_owned())?
 }
 
+/// Installation means registering code already shipped in the signed APK.
+/// This does not download or execute a third-party plugin, and new modules
+/// remain disabled until the user separately enables them.
+#[tauri::command]
+pub async fn android_plugins_install_bundled(
+    state:tauri::State<'_,AndroidPluginsRuntime>,
+    plugin_id:String,user_initiated:bool,
+)->Result<Value,String>{
+    if !cfg!(target_os="android")||!user_initiated {
+        return Err("Explicit Android Plugins installation action required".into());
+    }
+    let runtime=state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime.change_bundled_installation(&plugin_id,true)?;
+        runtime.projection()
+    }).await.map_err(|_|"Android bundled plugin installation interrupted".to_owned())?
+}
+
+#[tauri::command]
+pub async fn android_plugins_uninstall_bundled(
+    state:tauri::State<'_,AndroidPluginsRuntime>,
+    plugin_id:String,user_initiated:bool,
+)->Result<Value,String>{
+    if !cfg!(target_os="android")||!user_initiated {
+        return Err("Explicit Android Plugins uninstall action required".into());
+    }
+    let runtime=state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime.change_bundled_installation(&plugin_id,false)?;
+        runtime.projection()
+    }).await.map_err(|_|"Android bundled plugin removal interrupted".to_owned())?
+}
+
+#[tauri::command]
+pub async fn android_plugins_check_update(
+    state:tauri::State<'_,AndroidPluginsRuntime>,
+    plugin_id:String,user_initiated:bool,
+)->Result<Value,String>{
+    if !cfg!(target_os="android")||!user_initiated {
+        return Err("Explicit Android Plugins update check required".into());
+    }
+    if !bundled_update_target(&plugin_id) {
+        return Err("Third-party plugin update checks are unsupported".into());
+    }
+    let installed=state.registry.lock()
+        .map_err(|_|"Plugin catalog unavailable".to_owned())?
+        .list().iter().any(|item|item.id==plugin_id && item.installed);
+    if !installed {
+        return Err("Install the bundled module before checking its app release".into());
+    }
+    // Deliberately NOT an automatic updater: there is no background task,
+    // binary download, APK installer, or assumption that the official APK
+    // signer matches this device's existing debug-signed installation.
+    Ok(fetch_official_release_check(&plugin_id).await)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, AtomicUsize,Ordering};
+
+    fn official_release_fixture(version:&str)->Value {
+        json!({"draft":false,"prerelease":false,"tag_name":version,
+            "html_url":format!("https://github.com/airesz178/Mcp-Agent-Ai/releases/tag/{version}"),
+            "assets":[{
+                "name":OFFICIAL_ANDROID_APK_NAME,"state":"uploaded",
+                "size":402_826_963,
+                "digest":format!("sha256:{}", "a".repeat(64)),
+                "browser_download_url":format!(
+                    "https://github.com/airesz178/Mcp-Agent-Ai/releases/download/{version}/{OFFICIAL_ANDROID_APK_NAME}")
+            }]})
+    }
+
+    #[test]
+    fn official_github_release_check_accepts_only_bounded_verified_metadata() {
+        let (major,minor,patch)=release_version(env!("CARGO_PKG_VERSION")).unwrap();
+        let newer=if patch<u32::MAX {format!("v{major}.{minor}.{}",patch+1)}
+            else {format!("v{major}.{}.0",minor+1)};
+        let receipt=parse_official_release("browser",&official_release_fixture(&newer)).unwrap();
+        assert_eq!(receipt["checkSucceeded"],true);
+        assert_eq!(receipt["updateAvailable"],true);
+        assert_eq!(receipt["version"],newer.trim_start_matches('v'));
+        assert_eq!(receipt["url"],format!(
+            "https://github.com/airesz178/Mcp-Agent-Ai/releases/tag/{newer}"));
+        assert_eq!(receipt["assetName"],OFFICIAL_ANDROID_APK_NAME);
+        assert_eq!(receipt["assetDigest"],format!("sha256:{}", "a".repeat(64)));
+        assert_eq!(receipt["assetDigestSource"],"github_release_metadata");
+        assert_eq!(receipt["automaticInstallSupported"],false);
+        assert_eq!(receipt["signingCompatibilityVerified"],false);
+
+        let same=parse_official_release("browser",
+            &official_release_fixture(&format!("v{}",env!("CARGO_PKG_VERSION")))).unwrap();
+        assert_eq!(same["checkSucceeded"],true);
+        assert_eq!(same["updateAvailable"],false);
+        assert_eq!(same["reason"],"already_current_or_newer");
+        assert!(parse_official_release("browser",
+            &official_release_fixture("v0.0.0")).unwrap()["updateAvailable"]==false);
+
+        let mut missing_digest=official_release_fixture(&newer);
+        missing_digest["assets"][0]["digest"]=Value::Null;
+        let missing=parse_official_release("browser",&missing_digest).unwrap();
+        assert_eq!(missing["checkSucceeded"],true);
+        assert_eq!(missing["updateAvailable"],false);
+        assert_eq!(missing["assetDigest"],Value::Null);
+        assert_eq!(missing["reason"],"android_apk_digest_missing");
+        let mut no_apk=official_release_fixture(&newer);
+        no_apk["assets"]=json!([]);
+        let unavailable=parse_official_release("browser",&no_apk).unwrap();
+        assert_eq!(unavailable["checkSucceeded"],true);
+        assert_eq!(unavailable["updateAvailable"],false);
+        assert_eq!(unavailable["reason"],"android_apk_asset_missing");
+    }
+
+    #[test]
+    fn official_release_check_rejects_forged_urls_hashes_tags_and_assets() {
+        assert!(release_version("v0.2.3").is_some());
+        for invalid in ["v0.2.3-rc1","v0.2","v0.2.3.4","v0.02.3",
+            "https://evil.example/v1.2.3","v1.2.3%2ftrick","v1.2.3\n"] {
+            assert!(release_version(invalid).is_none(),"{invalid}");
+        }
+        let valid=official_release_fixture("v0.2.9");
+        let mut tampered=valid.clone();
+        tampered["html_url"]=json!("https://github.com.evil.example/airesz178/Mcp-Agent-Ai/releases/tag/v0.2.9");
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"invalid_release_url");
+        tampered=valid.clone();
+        tampered["html_url"]=json!("https://evil.example/airesz178/Mcp-Agent-Ai/releases/tag/v0.2.9");
+        assert!(parse_official_release("browser",&tampered).is_err());
+        tampered=valid.clone();
+        tampered["html_url"]=json!("https://github.com/airesz178/Mcp-Agent-Ai/releases/tag/v0.2.9?redirect=true");
+        assert!(parse_official_release("browser",&tampered).is_err());
+        tampered=valid.clone();
+        tampered["assets"][0]["browser_download_url"]=json!(
+            "https://github.com/airesz178/Mcp-Agent-Ai/releases/download/v0.2.9/other.apk");
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"invalid_android_apk_url");
+        tampered=valid.clone();
+        tampered["assets"][0]["digest"]=json!("sha256:deadbeef");
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"invalid_android_apk_digest");
+        tampered=valid.clone();
+        tampered["assets"][0]["size"]=json!(0);
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"invalid_android_apk_size");
+        tampered=valid.clone();
+        tampered["assets"][0]["size"]=json!(RELEASE_APK_MAX_SIZE+1);
+        assert!(parse_official_release("browser",&tampered).is_err());
+        tampered=valid.clone();
+        tampered["assets"][0]["state"]=json!("starter");
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"android_apk_not_uploaded");
+        tampered=valid.clone();
+        tampered["assets"].as_array_mut().unwrap().push(valid["assets"][0].clone());
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"ambiguous_android_apk_asset");
+        tampered=valid.clone();
+        tampered["assets"]=json!(vec![json!({"name":"untrusted.zip"});RELEASE_ASSET_COUNT_LIMIT+1]);
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"release_asset_limit_exceeded");
+        tampered=valid.clone();
+        tampered["prerelease"]=json!(true);
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"non_stable_release");
+        tampered=valid;
+        tampered["draft"]=json!(true);
+        assert_eq!(parse_official_release("browser",&tampered).unwrap_err(),"non_stable_release");
+        assert!(bundled_update_target("app_control"));
+        assert!(!bundled_update_target("unknown_remote"));
+    }
+
+    #[test]
+    fn release_check_no_network_result_never_claims_a_fake_update() {
+        let missing=release_check_failure("browser","no_published_release");
+        assert_eq!(missing["checkSucceeded"],false);
+        assert_eq!(missing["updateAvailable"],false);
+        for name in ["version","url","assetDigest","assetName"] {
+            assert!(missing[name].is_null(),"{name}");
+        }
+        let mut body=Vec::new();
+        assert!(append_release_chunk(&mut body,&vec![b'x';RELEASE_RESPONSE_LIMIT]));
+        assert_eq!(body.len(),RELEASE_RESPONSE_LIMIT);
+        assert!(!append_release_chunk(&mut body,b"x"));
+        assert_eq!(body.len(),RELEASE_RESPONSE_LIMIT);
+        let mut empty=Vec::new();
+        assert!(!append_release_chunk(&mut empty,&vec![b'x';RELEASE_RESPONSE_LIMIT+1]));
+        assert!(empty.is_empty());
+    }
+
+    /// Optional manual smoke test of the production HTTPS client. It is
+    /// intentionally ignored by default: a fresh public repository can have
+    /// zero stable releases or the device can be offline.
+    #[tokio::test]
+    #[ignore = "Requires external GitHub network access; metadata only"]
+    async fn official_github_release_check_live_metadata_only() {
+        let receipt=fetch_official_release_check("browser").await;
+        eprintln!("Official GitHub release metadata check: checkSucceeded={}, reason={}, version={}",
+            receipt["checkSucceeded"],receipt["reason"],receipt["version"]);
+        assert!(receipt["checkSucceeded"].is_boolean());
+        assert!(receipt["updateAvailable"].is_boolean());
+        assert_eq!(receipt["automaticInstallSupported"],false);
+        assert_eq!(receipt["signingCompatibilityVerified"],false);
+        if receipt["checkSucceeded"]==false {
+            assert_eq!(receipt["updateAvailable"],false);
+            assert!(receipt["version"].is_null());
+            assert!(receipt["url"].is_null());
+            assert!(receipt["assetDigest"].is_null());
+        }
+    }
 
     fn live_test_identity(generation:u64)->CoreTunnelIdentity {
         CoreTunnelIdentity {
@@ -1198,6 +1600,73 @@ mod tests {
         persist_catalog(&path,"{\"version\":2}").unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(),"{\"version\":2}");
         let _=fs::remove_file(path);
+    }
+
+    #[test]
+    fn bundled_lifecycle_commits_before_aliases_are_visible_and_survives_restart() {
+        let path=catalog_for_test();
+        let registry=Arc::new(Mutex::new(AndroidPluginRegistry::with_builtins()));
+        let host:Arc<dyn AndroidLocalToolHost>=Arc::new(MarketplaceHost(Arc::new(TestHost)));
+        change_persisted_catalog(&registry,&path,|next|
+            next.set_enabled("security_audit",true)).unwrap();
+        refresh_native(&registry,host.clone(),&path).unwrap();
+        let old_alias=registry.lock().unwrap().tools_list().into_iter()
+            .find_map(|v|v["name"].as_str().filter(|n|n.ends_with("_s_analyze"))
+                .map(str::to_owned)).unwrap();
+
+        change_persisted_catalog(&registry,&path,|next|
+            next.uninstall_bundled("security_audit")).unwrap();
+        let item=registry.lock().unwrap().catalog()["plugins"].as_array().unwrap()
+            .iter().find(|item|item["id"]=="security_audit").unwrap().clone();
+        assert_eq!(item["installed"],false);
+        assert_eq!(item["enabled"],false);
+        assert_eq!(item["state"],"not_installed");
+        assert!(registry.lock().unwrap().inspect_tool(&old_alias,&json!({"text":"ok"})).is_err());
+
+        let rebooted=Arc::new(Mutex::new(read_catalog(&path)));
+        refresh_native(&rebooted,host.clone(),&path).unwrap();
+        assert_eq!(rebooted.lock().unwrap().catalog()["plugins"][2]["installed"],false);
+        let denial=handle_plugin_rpc(
+            &json!({"jsonrpc":"2.0","id":19,"method":"tools/call",
+                "params":{"name":old_alias,"arguments":{"text":"hello"}}}),
+            &rebooted,host.clone(),&||None,&Arc::new(Mutex::new(None)),
+            Instant::now()+Duration::from_secs(5),&path);
+        assert!(!denial.successful_tool_call,
+            "A cached ChatGPT alias cannot invoke an uninstalled module after restart");
+        assert!(change_persisted_catalog(&rebooted,&path,|next|
+            next.set_enabled("security_audit",true)).is_err());
+        change_persisted_catalog(&rebooted,&path,|next|
+            next.install_bundled("security_audit")).unwrap();
+        assert_eq!(rebooted.lock().unwrap().catalog()["plugins"][2]["installed"],true);
+        assert_eq!(rebooted.lock().unwrap().catalog()["plugins"][2]["enabled"],false);
+        change_persisted_catalog(&rebooted,&path,|next|
+            next.set_enabled("security_audit",true)).unwrap();
+        refresh_native(&rebooted,host,&path).unwrap();
+        let current=rebooted.lock().unwrap().tools_list().into_iter()
+            .find_map(|v|v["name"].as_str().filter(|n|n.ends_with("_s_analyze"))
+                .map(str::to_owned)).unwrap();
+        assert_ne!(current,old_alias);
+        assert!(rebooted.lock().unwrap().inspect_tool(&old_alias,
+            &json!({"text":"hello"})).is_err());
+        let _=fs::remove_file(path);
+    }
+
+    #[test]
+    fn failed_catalog_mutation_does_not_claim_installation_or_disable() {
+        let invalid_parent=std::env::temp_dir()
+            .join(format!("mcp-plugin-lifecycle-{}",uuid::Uuid::new_v4()));
+        fs::write(&invalid_parent,b"not a directory").unwrap();
+        let path=invalid_parent.join("catalog.json");
+        let registry=Arc::new(Mutex::new(AndroidPluginRegistry::with_builtins()));
+        let original=registry.lock().unwrap().export_config().unwrap();
+        assert!(change_persisted_catalog(&registry,&path,|next|
+            next.uninstall_bundled("security_audit")).is_err());
+        assert_eq!(registry.lock().unwrap().export_config().unwrap(),original);
+        assert_eq!(registry.lock().unwrap().catalog()["plugins"][2]["installed"],true);
+        assert!(change_persisted_catalog(&registry,&path,|next|
+            next.install_bundled("unknown_external")).is_err());
+        assert_eq!(registry.lock().unwrap().export_config().unwrap(),original);
+        let _=fs::remove_file(invalid_parent);
     }
 
     #[test]

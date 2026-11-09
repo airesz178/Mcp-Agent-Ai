@@ -1,10 +1,18 @@
 package ai.mcpagent.app
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.app.PendingIntent
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
+import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.system.Os
 import android.system.OsConstants
@@ -24,6 +32,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.UUID
 
 @InvokeArg
 class AppTerminalRunArgs {
@@ -41,6 +51,15 @@ class AppTerminalCancelArgs {
 
 @InvokeArg
 class TermuxUserActionArgs {
+  var userInitiated: Boolean = false
+}
+
+@InvokeArg
+class TermuxRunCommandArgs {
+  var requestId: String = ""
+  var tool: String = ""
+  var action: String = ""
+  var target: String? = null
   var userInitiated: Boolean = false
 }
 
@@ -66,6 +85,12 @@ class AppTerminalPlugin(private val activity: Activity) : Plugin(activity) {
     private const val SANDBOX = "terminal-public"
     private const val TERMUX_PACKAGE = "com.termux"
     private const val TERMUX_ACTIVITY = "com.termux.app.TermuxActivity"
+    private const val TERMUX_RUN_COMMAND_SERVICE = "com.termux.app.RunCommandService"
+    private const val TERMUX_RUN_PERMISSION = "com.termux.permission.RUN_COMMAND"
+    private const val TERMUX_RUN_ACTION = "com.termux.RUN_COMMAND"
+    private const val TERMUX_RESULT_ACTION = "ai.mcpagent.app.TERMUX_RUN_RESULT_INTERNAL"
+    private const val TERMUX_RESULT_REQUEST_ID = "ai.mcpagent.app.termux.request_id"
+    private const val TERMUX_RUN_WAIT_MS = 30_000L
     private const val TERMUX_INSTALL_URL = "https://f-droid.org/packages/com.termux/"
     private const val MAX_OUTPUT = 16 * 1024
     private const val MAX_DURATION_MS = 5_000L
@@ -77,11 +102,88 @@ class AppTerminalPlugin(private val activity: Activity) : Plugin(activity) {
     private val watchdog = Executors.newSingleThreadScheduledExecutor { r ->
       Thread(r, "cos-app-terminal-timeout").apply { isDaemon = true }
     }
+    private val termuxPending = AtomicReference<TermuxPending?>(null)
+    private val termuxRequestCode = AtomicInteger(10_000)
+    private val termuxHandler = Handler(Looper.getMainLooper())
+    private val termuxResultObserved = AtomicBoolean(false)
     // Filenames are one non-hidden .txt segment; shell metacharacters disallowed.
     private val SAFE_NAME = Regex("^[A-Za-z0-9][A-Za-z0-9._-]{0,59}\\.txt$")
     private val UUID_PATTERN =
       Regex("^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
     private val RESERVED = Regex("(?i)(secret|token|key|history|session|credential|config|private|project|auth|password|backup)")
+
+    private fun completeTermux(pending: TermuxPending, error: String? = null,
+      output: TermuxRunOutcome? = null) {
+      if (!termuxPending.compareAndSet(pending, null)) return
+      pending.timer?.let(termuxHandler::removeCallbacks)
+      pending.reply?.cancel()
+      if (output != null) {
+        termuxResultObserved.set(true)
+        pending.invoke.resolve(JSObject().apply {
+          put("requestId", pending.requestId)
+          put("tool", pending.spec.program)
+          put("action", pending.spec.action)
+          put("processStarted", true)
+          put("completed", true)
+          put("resultVerified", true)
+          put("success", output.success)
+          put("exitCode", output.exitCode)
+          put("stdout", output.stdout)
+          put("stderr", output.stderr)
+          put("stdoutOriginalLength", output.stdoutOriginalLength)
+          put("stderrOriginalLength", output.stderrOriginalLength)
+          put("source", "termux_run_command")
+          put("termuxExecutionContext", "external-termux-app")
+          put("termuxWorkspaceShared", false)
+          put("timedOut", false)
+        })
+      } else {
+        pending.invoke.reject(error ?: "Termux did not return a verified command result")
+      }
+    }
+
+    /** Non-exported receiver invoked solely by the one-shot callback token
+     * supplied to the exact com.termux.RunCommandService. A service launch is
+     * never treated as proof of a process exit. */
+    internal fun deliverTermuxResult(intent: Intent?) {
+      val pending = termuxPending.get() ?: return
+      if (intent == null || intent.action != TERMUX_RESULT_ACTION ||
+        intent.dataString != pending.replyUri ||
+        intent.getStringExtra(TERMUX_RESULT_REQUEST_ID) != pending.requestId) return
+      val bundle = try { intent.getBundleExtra("result") } catch (_: Exception) { null }
+      if (bundle == null) {
+        completeTermux(pending, "Termux returned no verified result bundle")
+        return
+      }
+      val outcome = try {
+        fun number(key: String): Long? = when (val v = bundle.get(key)) {
+          is String -> v.toLongOrNull()
+          is Int -> v.toLong()
+          is Long -> v
+          else -> null
+        }
+        TermuxRunPolicy.verifiedResult(
+          if (bundle.containsKey("exitCode")) bundle.getInt("exitCode") else null,
+          if (bundle.containsKey("err")) bundle.getInt("err") else null,
+          bundle.get("stdout") as? String,
+          bundle.get("stderr") as? String,
+          number("stdout_original_length"),
+          number("stderr_original_length")
+        )
+      } catch (_: Exception) {
+        completeTermux(pending, "Termux result was malformed, truncated or unsuccessful internally")
+        return
+      }
+      completeTermux(pending, output = outcome)
+    }
+  }
+
+  private class TermuxPending(
+    val requestId: String, val spec: TermuxRunSpec, val invoke: Invoke,
+    val replyUri: String
+  ) {
+    var reply: PendingIntent? = null
+    var timer: Runnable? = null
   }
 
   private class Running(val id: String) {
@@ -177,6 +279,161 @@ class AppTerminalPlugin(private val activity: Activity) : Plugin(activity) {
     true
   } catch (_: Exception) {
     false
+  }
+
+  private fun termuxVersionSupportsResult(): Boolean = try {
+    val info = activity.packageManager.getPackageInfo(TERMUX_PACKAGE, 0)
+    TermuxRunPolicy.versionSupportsResult(info.versionName)
+  } catch (_: Exception) { false }
+
+  private fun termuxServiceVisible(): Boolean = try {
+    val service=activity.packageManager.getServiceInfo(
+      ComponentName(TERMUX_PACKAGE, TERMUX_RUN_COMMAND_SERVICE),0)
+    service.packageName == TERMUX_PACKAGE &&
+      service.name == TERMUX_RUN_COMMAND_SERVICE && service.exported
+  } catch (_: Exception) { false }
+
+  private fun runCommandPermission(): Boolean = try {
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+      activity.checkSelfPermission(TERMUX_RUN_PERMISSION) ==
+        PackageManager.PERMISSION_GRANTED
+  } catch (_: Exception) { false }
+
+  private fun foregroundUnlocked(): Boolean = try {
+    val power=activity.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+    val keyguard=activity.getSystemService(Context.KEYGUARD_SERVICE) as? android.app.KeyguardManager
+    (!activity.isFinishing && !activity.isDestroyed &&
+      activity.window.decorView.isShown &&
+      power?.isInteractive == true &&
+      keyguard?.isKeyguardLocked == false && keyguard?.isDeviceLocked == false)
+  } catch (_: Exception) { false }
+
+  private fun canStartTermuxCommand(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && termuxInstalled() &&
+      termuxVersionSupportsResult() && termuxServiceVisible() &&
+      runCommandPermission()
+
+  private fun termuxCommandStatusObject(): JSObject = JSObject().apply {
+    put("supported", canStartTermuxCommand())
+    put("installed", termuxInstalled())
+    put("termuxResultSupported", termuxVersionSupportsResult())
+    put("serviceVisible", termuxServiceVisible())
+    put("runCommandPermissionGranted", runCommandPermission())
+    put("foreground", foregroundUnlocked())
+    // This property lives in Termux's private storage. A real reply, not a
+    // saved setting or renderer flag, proves that the callback path worked.
+    put("allowExternalAppsVerified", termuxResultObserved.get())
+    put("allowExternalAppsRequiresUserSetup", true)
+    put("running", termuxPending.get() != null)
+    put("termuxExecutionContext", "external-termux-app")
+    put("termuxWorkspaceShared", false)
+    put("userInitiatedRequired", true)
+    put("maxConcurrency", 1)
+    put("maxOutputBytes", TermuxRunPolicy.MAX_RESULT_BYTES)
+    put("maxWaitMs", TERMUX_RUN_WAIT_MS)
+    put("programs", listOf("node", "npm", "ssh"))
+    put("autoRun", false)
+  }
+
+  @Command
+  fun termuxCommandStatus(invoke: Invoke) {
+    activity.runOnUiThread { invoke.resolve(termuxCommandStatusObject()) }
+  }
+
+  /** No UI-supplied executable, arbitrary argv, stdin, shell or shared
+   * storage. startService success is never a successful process receipt. */
+  private fun startApprovedTermux(pending: TermuxPending) {
+    if (termuxPending.get() !== pending) return
+    if (!foregroundUnlocked() || !canStartTermuxCommand()) {
+      completeTermux(pending,"Termux settings, OS permission or foreground access changed")
+      return
+    }
+    try {
+      val callback = Intent(activity, TermuxRunResultReceiver::class.java).apply {
+        action = TERMUX_RESULT_ACTION
+        data = Uri.parse(pending.replyUri)
+        putExtra(TERMUX_RESULT_REQUEST_ID, pending.requestId)
+      }
+      val requestCode=termuxRequestCode.getAndIncrement()
+      val flags=PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_CANCEL_CURRENT or
+        (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0)
+      val reply=PendingIntent.getBroadcast(activity,requestCode,callback,flags)
+      pending.reply=reply
+      val intent=Intent(TERMUX_RUN_ACTION).apply {
+        setClassName(TERMUX_PACKAGE,TERMUX_RUN_COMMAND_SERVICE)
+        putExtra("com.termux.RUN_COMMAND_PATH",pending.spec.executable)
+        putExtra("com.termux.RUN_COMMAND_ARGUMENTS",pending.spec.arguments)
+        putExtra("com.termux.RUN_COMMAND_WORKDIR",pending.spec.workingDirectory)
+        putExtra("com.termux.RUN_COMMAND_BACKGROUND",true)
+        putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL","Mcp Agent Ai: ${pending.spec.humanLabel}")
+        putExtra("com.termux.RUN_COMMAND_PENDING_INTENT",reply)
+      }
+      val timer=Runnable { completeTermux(pending,
+        "Termux result timed out; execution state cannot be verified") }
+      pending.timer=timer
+      termuxHandler.postDelayed(timer,TERMUX_RUN_WAIT_MS)
+      // Android service dispatch is not proof of execution or exit code.
+      if (activity.startService(intent) == null) {
+        completeTermux(pending,"Termux RUN_COMMAND service unavailable")
+      }
+    } catch (_: SecurityException) {
+      completeTermux(pending,"Termux RUN_COMMAND permission or external-app setting denied")
+    } catch (_: Exception) {
+      completeTermux(pending,"Termux service did not accept the command")
+    }
+  }
+
+  @Command
+  fun termuxCommandRun(invoke: Invoke) {
+    val args=try { invoke.parseArgs(TermuxRunCommandArgs::class.java) }
+      catch (_: Exception) { invoke.reject("Invalid Termux command request"); return }
+    if (!args.userInitiated || !validId(args.requestId)) {
+      invoke.reject("Termux requires user initiation and a canonical request UUID")
+      return
+    }
+    val spec=try {
+      TermuxRunPolicy.fromTarget(args.tool,args.action,args.target)
+    } catch (_: Exception) {
+      invoke.reject("Termux program, action or target is not allowlisted")
+      return
+    }
+    activity.runOnUiThread {
+      if (!foregroundUnlocked() || !activity.hasWindowFocus()) {
+        invoke.reject("Termux action requires the unlocked foreground app")
+        return@runOnUiThread
+      }
+      if (!canStartTermuxCommand()) {
+        invoke.reject("Termux >=0.109, RUN_COMMAND permission and enabled service are required")
+        return@runOnUiThread
+      }
+      val token=UUID.randomUUID().toString()
+      val pending=TermuxPending(args.requestId,spec,invoke,
+        "mcpagent-termux://result/$token")
+      if (!termuxPending.compareAndSet(null,pending)) {
+        invoke.reject("Another Termux RUN_COMMAND request is pending")
+        return@runOnUiThread
+      }
+      try {
+        val targetHint=when {
+          args.target == null -> ""
+          args.target!!.length <= 100 -> "\nTarget: ${args.target}"
+          else -> "\nTarget: (bounded validated target)"
+        }
+        AlertDialog.Builder(activity)
+          .setTitle("Allow Termux command once?")
+          .setMessage("Run ${spec.humanLabel} in Termux's own environment?$targetHint\n\n" +
+            "This may read or change Termux-owned project files. Output will return to Mcp Agent Ai. " +
+            "No Mcp Agent Ai private files are shared. Approval is for this request only.")
+          .setPositiveButton("Run once") { _, _ -> startApprovedTermux(pending) }
+          .setNegativeButton("Cancel") { _, _ ->
+            completeTermux(pending,"Termux command not approved by the user")
+          }
+          .setOnCancelListener { completeTermux(pending,"Termux command cancelled") }
+          .show()
+      } catch (_: Exception) {
+        completeTermux(pending,"Native Termux confirmation cannot be shown")
+      }
+    }
   }
 
   private fun termuxStatusObject(): JSObject {

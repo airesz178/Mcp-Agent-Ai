@@ -139,6 +139,7 @@ mod android_plugins;
 mod android_plugins_approvals;
 mod android_pet_overlay;
 mod android_private_browser;
+mod android_project_runtime;
 mod android_pty;
 mod android_review_share;
 mod android_speech_dictation;
@@ -1041,6 +1042,14 @@ pub fn run() {
             android_terminal::android_termux_status,
             android_terminal::android_termux_install,
             android_terminal::android_termux_open,
+            android_terminal::android_termux_command_status,
+            android_terminal::android_termux_command_run,
+            android_project_runtime::android_project_runtime_status,
+            android_project_runtime::android_project_node,
+            android_project_runtime::android_project_npm,
+            android_project_runtime::android_project_ssh_identity,
+            android_project_runtime::android_project_ssh_pin,
+            android_project_runtime::android_project_ssh_run,
             android_pty::android_pty_status,
             android_pty::android_pty_capabilities,
             android_pty::android_pty_create,
@@ -1080,6 +1089,12 @@ pub fn run() {
             android_plugins::android_plugins_catalog,
             #[cfg(target_os = "android")]
             android_plugins::android_plugins_set_enabled,
+            #[cfg(target_os = "android")]
+            android_plugins::android_plugins_install_bundled,
+            #[cfg(target_os = "android")]
+            android_plugins::android_plugins_uninstall_bundled,
+            #[cfg(target_os = "android")]
+            android_plugins::android_plugins_check_update,
             android_tunnel_credentials::android_tunnel_credentials_status,
             android_tunnel_credentials::android_tunnel_credentials_store,
             android_tunnel_credentials::android_tunnel_credentials_remove,
