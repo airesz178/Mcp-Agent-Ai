@@ -114,18 +114,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed' }
           $sha256 = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash
           $notes = @(
-            'Mcp Agent Ai v0.2.2 Android preview for ARM64 devices (Android 8.0+).',
+            'Mcp Agent Ai v0.2.2 Android preview 2 for ARM64 devices (Android 8.0+).',
             '',
             'Install the APK and open Settings → Setup to review permissions, sign in to ChatGPT or select an API provider, and configure the optional MCP Core Tunnel.',
-            'Includes Android chat, Plan/Goal, Prime Sub-agents, native private browser, optional tool approvals, skills, and plugin controls.',
+            'Includes Android chat, Plan/Goal, Prime Sub-agents, native private browser, optional tool approvals, skills, and bundled plugin install/disable/uninstall controls.',
+            'New: per-project SSH host-key pinning and real process receipts, optional permissioned Termux RUN_COMMAND Node/npm/SSH bridge, plus a read-only official plugin/app update check.',
             '',
             'This preview APK is debug signed. A differently signed installation cannot be updated in place; preserve your app data before changing signing identities.',
-            'Node/npm are not bundled; SSH project transport, third-party plugin auto-updates, and every COS desktop feature are not included.',
+            'Node/npm are not bundled. Termux and its RUN_COMMAND permission, user consent and separate Node/npm/SSH installation are required. SSH access requires a real native client, pinned host identity and authorized key. Dynamic third-party plugin installation and auto-updates are not included.',
             '',
             'APK SHA-256: ' + $sha256,
             'Documentation and screenshots: https://github.com/airesz178/Mcp-Agent-Ai#readme'
           )
           $notesFile = Join-Path $env:RUNNER_TEMP 'android-preview-release-notes.md'
           $notes | Set-Content -LiteralPath $notesFile -Encoding UTF8
-          gh release create v0.2.2-android-preview $artifact --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title 'Mcp Agent Ai v0.2.2 · Android Preview' --notes-file $notesFile
+          gh release create v0.2.2-android-preview.2 $artifact --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title 'Mcp Agent Ai v0.2.2 · Android Preview 2' --notes-file $notesFile
           if ($LASTEXITCODE -ne 0) { throw 'GitHub prerelease creation failed' }
