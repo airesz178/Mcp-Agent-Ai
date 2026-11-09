@@ -55,11 +55,20 @@ test('Markdown skills require explicit activation and are removable', async t =>
   assert.deepEqual((await loadState(home)).skills, []);
 });
 
-test('demo agent calls workspace tool and records a real result; cloud fails closed', async t => {
+test('agent executes a provider tool call and records its actual result; cloud fails closed', async t => {
   const { home, workspaceRoot } = await fixture(t);
   await setModule(home, 'workspace', true);
+  const provider = {
+    id: 'openai',
+    calls: 0,
+    async generate({ messages }) {
+      this.calls++;
+      if (this.calls === 1) return { text: '', toolCalls: [{ id: 'test-call', name: 'workspace_list', arguments: '{}' }] };
+      return { text: messages.at(-1).text, toolCalls: [] };
+    },
+  };
   await assert.rejects(runTurn({ home, workspaceRoot, prompt: '/list', execution: 'cloud' }), /not configured/);
-  const result = await runTurn({ home, workspaceRoot, prompt: '/list' });
+  const result = await runTurn({ home, workspaceRoot, prompt: '/list', model: 'test-model', provider });
   assert.match(result.answer, /hello.txt/);
   assert.deepEqual(result.actions, [{ tool: 'workspace_list', ok: true }]);
   assert.equal((await loadState(home)).sessions[0].id, result.sessionId);
@@ -69,7 +78,7 @@ test('a revoked module cannot execute a stale model tool call', async t => {
   const { home, workspaceRoot } = await fixture(t);
   await setModule(home, 'workspace', true);
   const provider = {
-    id: 'demo', calls: 0,
+    id: 'openai', calls: 0,
     async generate({ messages }) {
       this.calls++;
       if (this.calls === 1) {
@@ -79,7 +88,7 @@ test('a revoked module cannot execute a stale model tool call', async t => {
       return { text: messages.at(-1).text, toolCalls: [] };
     },
   };
-  const result = await runTurn({ home, workspaceRoot, prompt: 'read', provider });
+  const result = await runTurn({ home, workspaceRoot, prompt: 'read', model: 'test-model', provider });
   assert.equal(result.actions[0].ok, false);
   assert.match(result.answer, /Tool is not enabled/);
 });

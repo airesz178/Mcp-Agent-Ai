@@ -6,7 +6,7 @@ const PRESETS = Object.freeze({
   ollama: { baseURL: 'http://127.0.0.1:11434/v1', key: null },
 });
 
-export function providerNames() { return [...Object.keys(PRESETS), 'demo', 'hermes']; }
+export function providerNames() { return [...Object.keys(PRESETS), 'hermes']; }
 
 function endpoint(url, suffix) {
   const parsed = new URL(url);
@@ -83,18 +83,6 @@ function toAnthropicMessages(messages) {
 }
 
 export function makeProvider(name, { env = process.env, fetchFn = fetch } = {}) {
-  if (name === 'demo') {
-    return {
-      id: 'demo', async generate({ messages }) {
-        const last = messages.at(-1);
-        if (last.role === 'user' && last.text.trim() === '/list') {
-          return { text: '', toolCalls: [{ id: 'demo-call-1', name: 'workspace_list', arguments: '{}' }] };
-        }
-        if (last.role === 'tool') return { text: `Demo tool result: ${last.text}`, toolCalls: [] };
-        return { text: 'Demo provider is a local test only. Connect a real provider to use AI.', toolCalls: [] };
-      },
-    };
-  }
   const preset = PRESETS[name];
   if (!preset) throw new Error(`Unknown provider: ${name}`);
   const apiKey = preset.key ? env[preset.key] : undefined;

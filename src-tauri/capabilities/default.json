@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Allow only the Tauri core window APIs used by the native application.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

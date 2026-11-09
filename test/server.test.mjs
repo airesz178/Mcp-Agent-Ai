@@ -36,9 +36,10 @@ test('local preview serves static interface with privacy headers', async t => {
   const page = await app.get('/');
   const html = await page.text();
   assert.equal(page.status, 200);
-  assert.match(html, /COS Fusion/);
+  assert.match(html, /Mcp Agent Ai/);
   assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
   assert.equal((await app.get('/app.js')).status, 200);
+  assert.equal((await app.get('/android-boot.js')).status, 200);
   assert.equal((await app.get('/app.css')).status, 200);
 });
 
@@ -58,7 +59,7 @@ test('cannot call control API without same-origin session', async t => {
   assert.equal(hostileStatus, 403);
 });
 
-test('UI API switches modules, imports skills, and runs multi-turn demo agent', async t => {
+test('UI API switches modules and skills and rejects a nonexistent provider', async t => {
   const app = await preview(t);
   let state = await (await app.get('/api/state')).json();
   assert.equal(state.modules.workspace, false);
@@ -67,13 +68,11 @@ test('UI API switches modules, imports skills, and runs multi-turn demo agent', 
   const imported = await (await app.post('/api/skill', { action: 'add', name: 'review', text: '# Review first' })).json();
   assert.equal(imported.id, 'review');
   assert.equal((await app.post('/api/skill', { action: 'enable', id: 'review' })).status, 200);
-  const first = await (await app.post('/api/chat', { prompt: '/list', provider: 'demo', model: '' })).json();
-  assert.match(first.answer, /readme.txt/);
-  const second = await (await app.post('/api/chat', { prompt: 'hello', provider: 'demo', model: '', sessionId: first.sessionId })).json();
-  assert.equal(second.sessionId, first.sessionId);
+  const failed = await app.post('/api/chat', { prompt: 'hello', provider: 'demo', model: '' });
+  assert.equal(failed.status, 400);
+  assert.match((await failed.json()).error, /Unsupported provider/);
   state = await (await app.get('/api/state')).json();
-  assert.equal(state.sessions.length, 1);
-  assert.equal(state.sessions[0].messages.length, 4);
+  assert.equal(state.sessions.length, 0);
   assert.equal(state.skills[0].enabled, true);
   assert.equal((await app.post('/api/skill', { action: 'remove', id: 'review' })).status, 200);
 });

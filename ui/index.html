@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; frame-src 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#0d111b">
-  <title>COS Fusion — Workspace Preview 0.2.2</title>
+  <meta name="theme-color" content="#0c111b">
+  <title>Mcp Agent Ai — Workspace Preview 0.2.2</title>
+  <script src="/android-boot.js"></script>
   <link rel="stylesheet" href="/app.css">
   <script src="/app.js" defer></script>
 </head>
@@ -13,77 +15,1383 @@
   <div class="shell">
     <div class="sidebar-backdrop hidden" id="sidebarBackdrop"></div>
     <aside class="sidebar" id="sidebar" aria-label="Conversation navigation">
-      <div class="brand"><span class="brand-symbol" aria-hidden="true">✳</span><span>COS <strong>FUSION</strong><small>AGENT WORKSPACE <em>PREVIEW</em></small></span></div>
-      <button id="newChat" class="primary full" type="button"><span aria-hidden="true">＋</span> New conversation <span class="shortcut">Ctrl K</span></button>
-      <div class="section-title">HISTORY <span id="threadCount">0</span></div>
-      <nav id="threads" class="thread-list" aria-label="Recent chats"></nav>
-      <div class="side-bottom"><span class="status-dot"></span> Local workspace<span class="side-caption">Private session · Running on this device</span></div>
+      <div class="brand"><span class="brand-symbol" aria-hidden="true">✳</span><span class="brand-copy"><strong>Mcp Agent Ai</strong><small>YOUR AGENT WORKSPACE</small></span><button id="sidebarSearchButton" class="sidebar-brand-search" type="button" aria-label="Search chats" aria-controls="sidebarSearch" title="Search chats"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button></div>
+      <div class="sidebar-search-wrap"><label for="sidebarSearch">Search conversations</label><input id="sidebarSearch" type="search" placeholder="Search chats..." autocomplete="off" maxlength="100" aria-label="Search chats"><svg class="search-symbol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.7" cy="10.7" r="6.4"/><path d="m15.5 15.5 5 5"/></svg></div>
+      <div class="sidebar-section-label">WORKSPACE <span class="sidebar-section-mark" aria-hidden="true">01</span></div>
+      <button id="newChat" class="primary full" type="button"><span class="new-icon" aria-hidden="true">＋</span><svg class="android-ui-icon new-chat-android-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="new-chat-desktop">New conversation</span><span class="new-chat-android">New chat</span><span class="shortcut">Ctrl K</span></button>
+      <nav class="sidebar-mobile-nav" aria-label="Extensions">
+        <button type="button" data-sidebar-extra="plugins"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H5v5h2a2 2 0 0 1 0 4H5v6h4v-2a2 2 0 0 1 4 0v2h6v-6h-2a2 2 0 0 1 0-4h2V4h-6v2a2 2 0 0 1-4 0Z"/></svg>Plugins</button>
+        <button type="button" data-sidebar-extra="skills"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm-8 4.5 8 4.5 8-4.5M12 12v9"/></svg>Skills</button>
+        <button type="button" data-sidebar-extra="pets"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 9V6m8 3V6M6.3 13a2 2 0 1 0-3.8-1 2 2 0 0 0 3.8 1Zm11.4 0a2 2 0 1 1 3.8-1 2 2 0 0 1-3.8 1ZM8 13c.6-2 2-3 4-3s3.4 1 4 3c.6 2.4 2.5 3 2 5-.4 1.4-1.6 2-3 2-.9 0-1.8-.5-3-.5s-2.1.5-3 .5c-1.4 0-2.6-.6-3-2-.5-2 1.4-2.6 2-5Z"/></svg>Pets</button>
+      </nav>
+      <div class="android-sidebar-footer">
+      <button id="sidebarCustomize" class="outline sidebar-customize" type="button" aria-controls="settingsPanel" aria-expanded="false"><span class="sidebar-settings-desktop-icon" aria-hidden="true">◈</span><svg class="sidebar-settings-android-icon android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg><span class="sidebar-settings-desktop-text">Connections & tools</span><span class="sidebar-settings-android-text">Settings</span></button>
+      <button id="sidebarConnectionStatus" class="sidebar-connection-status" type="button" data-status="disconnected" aria-label="Connection status" aria-expanded="false" aria-controls="androidConnectionStatusPopover" title="Show connection status"><span class="sidebar-connection-dot" aria-hidden="true"></span><span class="sidebar-connection-label">Disconnected</span></button>
+      <section id="androidConnectionStatusPopover" class="android-connection-popover hidden" aria-label="ChatGPT and Core connection details"><div class="android-connection-popover-head"><strong id="androidConnectionPopoverTitle">Not connected</strong><span id="androidConnectionPopoverDot" data-status="disconnected" aria-hidden="true"></span></div><p id="androidConnectionStatusDetail" role="status">No verified ChatGPT response in this app session.</p><div class="android-connection-core"><strong>Core MCP tunnel</strong><span id="androidConnectionCoreStatus" role="status">Status not checked</span><button id="androidConnectionCoreToggle" type="button">Check Core status</button></div><button id="androidConnectionOpenSetup" type="button">Open Setup</button><button id="androidConnectionClose" type="button">Close</button></section>
+      </div>
+      <div class="sidebar-scroll-region" id="sidebarScrollRegion">
+        <section class="sidebar-projects" aria-label="Projects">
+          <div class="sidebar-group-heading"><button type="button" id="projectsToggle" aria-expanded="true" aria-controls="projectsContent"><svg class="sidebar-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>Projects</button><button type="button" id="projectAdd" aria-label="Add project or phone folder" aria-expanded="false" aria-controls="androidProjectAddMenu" title="Add project"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
+          <div id="androidProjectAddMenu" class="android-project-add-menu hidden"><button id="projectAddGroup" type="button">New project group</button><button id="projectChoosePhoneFolder" type="button">Choose folder on phone</button><button id="projectChooseServerSsh" type="button" disabled title="Android SSH remote workspace transport is not implemented">Folder on a server (SSH) — unavailable</button><p id="projectPhoneFolderStatus" role="status" aria-live="polite"></p></div>
+          <div id="projectsContent"><div id="projectsList" class="sidebar-projects-list"></div><form id="projectForm" class="project-create-form hidden"><input id="projectName" maxlength="40" type="text" placeholder="Project name" aria-label="Project name" required autocomplete="off"><button type="submit" aria-label="Save project"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L19 7"/></svg></button><button type="button" id="projectCancel" aria-label="Cancel project"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></form><div id="projectManage" class="project-manage hidden"><button id="projectRename" type="button">Rename</button><button id="projectRemove" type="button">Remove group</button><button id="projectUnlinkPhoneFolder" type="button" class="hidden">Remove folder access</button><p id="projectSelectedFolderStatus" role="status"></p></div><button id="projectAssign" class="project-assign hidden" type="button">＋ Add current chat to project</button>
+          </div>
+        </section>
+        <div class="section-title"><span class="desktop-chat-label">RECENT CHATS</span><button type="button" id="chatsToggle" aria-expanded="true" aria-controls="threads"><svg class="sidebar-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg><span>Chats</span></button><span id="threadCount">0</span><button type="button" id="chatsRefresh" aria-label="Refresh chats" title="Refresh chats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M5.5 9a7.3 7.3 0 0 1 12.3-2.5L20 11M4 13l2.2 4.5A7.3 7.3 0 0 0 18.5 15"/></svg></button></div>
+        <nav id="threads" class="thread-list" aria-label="Recent chats"></nav>
+      </div>
+      <div class="side-bottom"><span class="side-bottom-title"><span class="status-dot"></span> Local workspace</span><span class="side-caption">Your sessions stay on this device.</span></div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div class="top-left">
-          <button type="button" class="nav-toggle" id="sidebarToggle" aria-label="Open conversations" aria-expanded="false" aria-controls="sidebar">☰</button>
-          <span class="top-icon" aria-hidden="true">◇</span><span class="workspace-label">Workspace</span><span class="subtle slash">/</span><span class="subtle thread-heading" id="threadTitle">New chat</span>
+          <button type="button" class="nav-toggle" id="sidebarToggle" aria-label="Open conversations" aria-expanded="false" aria-controls="sidebar"><span class="nav-old-icon" aria-hidden="true">☰</span><svg class="nav-pane-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M9 4v16"/></svg></button>
+          <button type="button" class="sidebar-search-toggle" id="sidebarQuickSearch" aria-label="View menu" aria-controls="androidViewMenu" aria-expanded="false" aria-haspopup="menu" title="View menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+          <span class="top-icon" aria-hidden="true">⌘</span><span class="workspace-label">Agent workspace</span><span class="subtle slash">/</span><span class="subtle thread-heading" id="threadTitle">New chat</span>
         </div>
-        <div class="top-actions"><span class="environment-pill"><span class="status-dot"></span> LOCAL</span><button type="button" id="newChatTop" class="outline compact-new">＋ New</button><button type="button" id="settingsToggle" class="outline settings-toggle" aria-controls="settingsPanel" aria-expanded="false">⚙ <span>Customize</span></button></div>
+        <div class="top-actions"><span class="environment-pill"><span class="status-dot"></span> LOCAL MODE</span><button type="button" id="newChatTop" class="outline compact-new">＋ New</button><button type="button" id="settingsToggle" class="outline settings-toggle" aria-controls="settingsPanel" aria-expanded="false">⚙ <span>Customize</span></button>
+          <button id="androidSubagentsToggle" class="android-subagents-toggle" type="button" aria-label="Open Sub-agents drawer" aria-controls="toolViewPanel" aria-expanded="false" title="Prime and worker activity">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="13" rx="3"/><path d="M12 3v4M9 3h6M8 12h.01M16 12h.01M8 16h8"/></svg>
+            <span id="androidSubagentsHeaderDot" aria-hidden="true"></span>
+          </button>
+          <button id="androidBrowserDrawerToggle" class="android-browser-drawer-toggle" type="button" aria-label="Open browser drawer" title="Open private browser drawer">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M6.5 6.5h.01M9.5 6.5h.01"/><circle cx="12" cy="15" r="2.5"/></svg>
+          </button>
+          <button id="androidComposeMore" class="android-header-compose-more" type="button" aria-label="More chat options and standing rules" aria-expanded="false" aria-controls="androidComposeMoreMenu" title="Chat options and rules"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+          <button type="button" id="toolPanelToggle" class="tool-panel-toggle" aria-label="Open workspace panels" aria-controls="toolPanelMenu" aria-expanded="false" title="Workspace panels">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="4.5" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M14 4.5V19.5" stroke="currentColor" stroke-width="1.8"/></svg>
+          </button>
+        </div>
       </header>
+      <section id="androidComposeMoreMenu" class="android-compose-popover hidden" role="group" aria-label="Standing rules">
+        <form id="androidStandingRulesForm" class="android-standing-rules-form">
+          <strong>Standing rules</strong>
+          <small id="androidStandingRulesSession" class="android-rules-session">Chat session: None</small>
+          <label for="androidStandingRulesText">Rules for this chat only</label>
+          <textarea id="androidStandingRulesText" rows="5" maxlength="4000" disabled placeholder="Enter instructions for this chat session. Other chats will not inherit them." spellcheck="true"></textarea>
+          <div class="android-rule-actions"><button id="androidStandingRulesSave" type="submit" disabled>Set rules</button><button id="androidStandingRulesReset" type="button" disabled>Reset rules</button></div>
+          <p id="androidStandingRulesStatus" role="status" aria-live="polite">Load standing rules to edit.</p>
+          <small class="android-standing-rules-notice">Set stores rules only for this saved chat. Reset removes them. Rules for other chats stay separate. ChatGPT website receives them as visible user text, never tool permission.</small>
+        </form>
+      </section>
+
+      <div id="androidViewBackdrop" class="android-view-backdrop hidden"></div>
+      <nav id="androidViewMenu" class="android-view-menu hidden" role="menu" aria-label="View menu">
+        <button type="button" role="menuitem" data-view-action="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><span>Search chats</span><small>Ctrl+K</small></button>
+        <div class="android-view-separator" role="separator"></div>
+        <button type="button" role="menuitem" data-view-action="browser" disabled aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3 9h18M7 7h.01M10 7h.01"/></svg><span>Show browser drawer</span><small>Android</small></button>
+        <button type="button" role="menuitem" data-view-action="browser-tools" disabled aria-disabled="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h4"/></svg><span>Browser DOM tools</span><small>Advanced</small></button>
+        <button type="button" role="menuitem" data-view-action="pets"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="8" r="1.1"/><circle cx="12" cy="6" r="1.1"/><circle cx="17" cy="8" r="1.1"/><path d="M8 13c1-2 2-3 4-3s3 1 4 3c3 4 1 7-2 6-1-.5-3-.5-4 0-3 1-5-2-2-6Z"/></svg><span id="viewPetsLabel">Show pets</span></button>
+        <div class="android-view-separator" role="separator"></div>
+        <button type="button" role="menuitem" data-view-action="zoom-in"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M10.5 7.5v6m-3-3h6"/></svg><span>Zoom in</span><small>Ctrl++</small></button>
+        <button type="button" role="menuitem" data-view-action="zoom-out"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5M7.5 10.5h6"/></svg><span>Zoom out</span><small>Ctrl+−</small></button>
+        <button type="button" role="menuitem" data-view-action="zoom-reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg><span>Actual size</span><small id="viewZoomPercent">100%</small></button>
+        <div class="android-view-separator" role="separator"></div>
+      </nav>
+      <div id="androidBrowserBackdrop" class="android-browser-backdrop hidden">
+        <section class="android-browser-panel" id="androidBrowserPanel" role="dialog" aria-modal="true" aria-labelledby="androidBrowserTitle">
+          <header class="android-browser-head"><div><small>ANDROID WEBVIEW</small><strong id="androidBrowserTitle">In-app browser</strong></div><button id="androidBrowserClose" type="button" aria-label="Close in-app browser controls"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></header>
+          <p class="tool-view-description">Opens a visible in-app WebView, not Chrome. Requires Android System WebView support for a separate data profile; otherwise opening is blocked. Sessions use a distinct browser profile, but share the app process, and profile deletion may finish asynchronously. No background CDP is claimed.</p>
+          <form class="mobile-mcp-form" id="androidBrowserOpenForm"><label for="androidBrowserUrl">HTTPS website</label><input type="url" id="androidBrowserUrl" maxlength="2048" autocomplete="url" spellcheck="false" placeholder="https://example.org/" required><button type="submit">Open in-app browser</button></form>
+          <div class="mobile-mcp-actions"><button id="androidBrowserConsent" type="button">Allow DOM tools</button><button id="androidBrowserRefresh" type="button">Refresh tabs</button><button id="androidBrowserStop" type="button">Close all browser tabs</button></div>
+          <p id="androidBrowserStatus" role="status" aria-live="polite">Browser closed.</p>
+          <div id="androidBrowserTabs" class="android-browser-tabs"></div>
+          <button id="androidBrowserSnapshot" type="button">Inspect selected tab (DOM)</button>
+          <div id="androidBrowserSnapshotOutput" class="android-browser-snapshot"></div>
+          <button id="androidBrowserPreviewOnce" type="button" disabled>Preview selected tab once</button>
+          <div id="androidBrowserPreviewOutput" class="android-browser-snapshot hidden" aria-live="polite"></div>
+          <form id="androidBrowserActionForm" class="mobile-mcp-form">
+            <label for="androidBrowserAction">Action on inspected page</label><select id="androidBrowserAction"><option value="click">Click indexed element</option><option value="fill">Fill indexed input</option><option value="scroll">Scroll element / page</option><option value="inspect">Inspect indexed node (read-only)</option><option value="hover">Hover indexed node (synthetic DOM events)</option></select>
+            <label for="androidBrowserIndex">Element index (0 for page scroll)</label><input id="androidBrowserIndex" type="number" min="0" max="64" value="1">
+            <label for="androidBrowserValue">Text or scroll distance (-2000 to 2000)</label><input id="androidBrowserValue" type="text" maxlength="4096" autocomplete="off">
+            <button type="submit">Run one DOM action</button>
+          </form>
+        </section>
+      </div>
+      <div id="toolPanelBackdrop" class="tool-panel-backdrop hidden"></div>
+      <div id="toolPanelMenu" class="tool-panel-menu hidden" role="menu" aria-label="Workspace panels">
+        <button type="button" role="menuitem" data-tool-view="review">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4v12m0 0-3-3m3 3 3-3M18 20V8m0 0-3 3m3-3 3 3M5 4h4M15 20h4" /></svg><span>Review</span><small class="tool-menu-hint">Chats</small>
+        </button>
+        <button type="button" role="menuitem" data-tool-view="terminal">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m6 0h4" /></svg><span>Terminal</span><small class="tool-menu-hint">Local</small>
+        </button>
+        <button type="button" role="menuitem" data-tool-view="files">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v10H3zM3 7V5h7l2 2" /></svg><span>Files</span><small class="tool-menu-hint">Private</small>
+        </button>
+        <button type="button" role="menuitem" data-tool-view="subagents">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4m-3 0h6M8 13h.01M16 13h.01M9 17h6" /></svg><span>Sub-agents</span><small class="tool-menu-hint">Status</small>
+        </button>
+      </div>
 
       <section class="workspace">
         <div class="chat-column">
           <div id="messages" class="messages" aria-label="Conversation transcript" aria-live="polite" aria-relevant="additions text">
             <div class="welcome" id="welcome">
-              <div class="hero-icon" aria-hidden="true">✳</div>
-              <div class="eyebrow">YOUR AI WORKSPACE</div>
-              <h1>What are we building?</h1>
-              <p>One calm place for your models, tools and conversations. Choose a provider, shape your workspace, and start creating.</p>
-              <div class="welcome-grid">
-                <div><span aria-hidden="true">⌘</span><strong>Explore a project</strong><small>Read files from an approved local workspace</small></div>
-                <div><span aria-hidden="true">⬡</span><strong>Choose your model</strong><small>OpenAI · Anthropic · OpenRouter · Ollama</small></div>
-                <div><span aria-hidden="true">▦</span><strong>Make it yours</strong><small>Enable modules and import your own skills</small></div>
+              <div class="hero-icon" aria-hidden="true"><span class="hero-glyph">✳</span><img class="hero-app-icon" src="/app-icon.png" alt="" width="96" height="96"></div>
+              <div class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span> MCP AGENT AI <span class="eyebrow-line" aria-hidden="true"></span></div>
+              <h1>Your agents.<br><span>One workspace.</span></h1>
+              <p>Your workspace for ideas, answers and work that matters. Set up a connection once, then stay focused on the conversation.</p>
+              <div class="mobile-onboarding" aria-label="Get started">
+                <button type="button" class="mobile-connection" data-open-connection>
+                  <span class="mobile-connection-mark" aria-hidden="true">↗</span>
+                  <span class="mobile-connection-copy"><strong data-connection-title>Connect ChatGPT</strong><small data-connection-detail>Sign in to ChatGPT in Setup</small></span>
+                  <span class="mobile-connection-chevron" aria-hidden="true">›</span>
+                </button>
+                <div class="mobile-starter-label">OR START WITH AN IDEA</div>
+                <div class="mobile-starters">
+                  <button type="button" data-starter="Help me plan a project step by step">Plan a project <span aria-hidden="true">↗</span></button>
+                  <button type="button" data-starter="Help me review some code">Review some code <span aria-hidden="true">↗</span></button>
+                </div>
               </div>
-              <div class="preview-note"><span class="preview-dot"></span> EARLY PREVIEW · Native coding agents, live browser and cloud execution are still in development.</div>
+              <div class="welcome-section-label">YOUR WORKSPACE, YOUR RULES</div>
+              <div class="welcome-grid">
+                <div><span class="feature-icon" aria-hidden="true">⬡</span><strong>ChatGPT</strong><small>Use your ChatGPT account in the app.</small></div>
+                <div><span class="feature-icon" aria-hidden="true">🔑</span><strong>Connect securely</strong><small>Sign in and bring your private ChatGPT session.</small></div>
+                <div><span class="feature-icon" aria-hidden="true">▦</span><strong>Make it yours</strong><small>Manage conversations and available capabilities.</small></div>
+              </div>
+              <div class="preview-note"><span class="preview-dot"></span> Only real configured AI engines can respond.</div>
             </div>
           </div>
 
+          <section id="androidPrimeChatActivity" class="android-prime-chat-activity hidden" aria-label="Current Prime worker activity" aria-live="polite"></section>
           <div class="composer-wrap">
+            <section id="androidPlanEditor" class="android-plan-editor hidden" aria-label="Plan editor">
+              <div class="android-plan-editor-head"><strong>Plan</strong><button id="androidPlanClose" type="button" aria-label="Close plan editor">✕</button></div>
+              <p>Build an editable plan here. This does not open Sub-agents, create a Goal or execute any steps.</p>
+              <label for="androidPlanObjective">What do you want to plan?</label>
+              <textarea id="androidPlanObjective" maxlength="1000" rows="2" placeholder="Describe your goal or task"></textarea>
+              <label for="androidPlanSteps">Editable steps (one per line)</label>
+              <textarea id="androidPlanSteps" maxlength="3000" rows="4" placeholder="1. Inspect the project&#10;2. Make changes&#10;3. Test and double-check"></textarea>
+              <div class="android-plan-actions"><button id="androidPlanGenerate" type="button">Draft steps with AI</button><button id="androidPlanUseDraft" type="button">Use in chat</button></div>
+              <p id="androidPlanStatus" role="status" aria-live="polite">Edit the Plan here or ask ChatGPT to suggest steps in chat. Nothing runs automatically.</p>
+            </section>
+            <section id="chatToolApprovalPanel" class="chat-tool-approval hidden" aria-live="polite" aria-label="Pending AI tool approval">
+              <small>MODEL TOOL REQUEST · NO EXECUTION YET</small>
+              <strong id="chatToolApprovalName"></strong>
+              <p id="chatToolApprovalDescription">The model proposed a tool. Review the exact arguments before allowing any device or remote action.</p>
+              <pre id="chatToolApprovalArguments" class="files-preview"></pre>
+              <div class="mobile-mcp-actions"><button id="chatToolApprove" type="button">Approve one tool call</button><button id="chatToolReject" type="button">Reject</button></div>
+              <p id="chatToolApprovalStatus" role="status" aria-live="polite"></p>
+            </section>
             <div id="notice" class="notice" role="status" aria-live="polite"></div>
+            <div id="androidDuringTurnPending" class="android-during-turn-pending hidden" role="status" aria-live="polite">
+              <span id="androidDuringTurnPendingText">One follow-up waiting for this turn.</span>
+              <button id="androidDuringTurnCancel" type="button">Remove</button>
+            </div>
+            <form id="chatForm" class="composer">
+              <textarea id="prompt" rows="2" maxlength="50000" placeholder="Ask anything or describe a task…" aria-label="Message" required></textarea>
+              <div class="compose-foot">
+                <div class="android-compose-controls">
+                  <button id="androidComposeAdd" type="button" aria-label="Add to message" aria-expanded="false" aria-controls="androidComposeAddMenu" title="Add to message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+                  <button id="androidComposeMode" type="button" aria-label="Chat mode: Normal" aria-expanded="false" aria-controls="androidComposeModeMenu" title="Choose Normal or Goal mode"><span id="androidComposeModeLabel">Normal</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button>
+                  <button id="androidComposePlan" class="android-compose-optional android-compose-shown" type="button" aria-pressed="false" aria-controls="androidPlanEditor" title="Plan mode: prepare editable stages, not Sub-agents"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 6 2 2 3-4M11 6h9M4 14l2 2 3-4m2 2h9M4 21l2 2 3-4m2 2h9" transform="translate(0,-2) scale(1,.91)"/></svg><span>Plan</span></button>
+                  <button id="androidComposeReasoning" type="button" aria-label="Reasoning effort: Auto" title="Reasoning: Auto" aria-expanded="false" aria-controls="androidComposeReasoningMenu"><span aria-hidden="true">◈</span></button>
+                  <div id="androidComposeReasoningMenu" class="android-compose-popover hidden" role="group" aria-label="Reasoning effort"><strong class="android-reasoning-menu-head">Reasoning effort</strong><small id="androidComposeReasoningHint">Available only for supported API models.</small><button type="button" data-reasoning-effort="auto" aria-pressed="true">Auto<small>Use the model's default</small></button><button type="button" data-reasoning-effort="low" aria-pressed="false">Low</button><button type="button" data-reasoning-effort="medium" aria-pressed="false">Medium</button><button type="button" data-reasoning-effort="high" aria-pressed="false">High</button></div>
+                  <div id="androidComposeAddMenu" class="android-compose-popover hidden" role="group" aria-label="Add to message">
+                    <button type="button" data-compose-add="files" title="Browse local files; direct chat attachments are not yet supported"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 18 5-5 4 3 3-4 5 5"/></svg><span>Add photos &amp; files</span></button>
+                    <button type="button" data-compose-add="folder" title="Select a read-only phone folder for an Android Project"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7l2 3h9v10H3z"/></svg><span>Share a folder</span></button>
+                    <button type="button" data-compose-add="skills"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Zm-8 4.5 8 4.5 8-4.5M12 12v9"/></svg><span>Skills</span><svg class="android-compose-menu-trailing" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+                  </div>
+                  <div id="androidComposeModeMenu" class="android-compose-popover hidden" role="group" aria-label="Choose chat mode"><button type="button" data-compose-mode="normal" aria-pressed="true"><strong>Normal</strong><small>Send one chat request</small></button><button type="button" data-compose-mode="goal" aria-pressed="false"><strong>Goal</strong><small>Review and create a persistent Goal before running</small></button><button type="button" data-compose-mode="loop" aria-pressed="false" disabled><strong>Loop</strong><small>Continuous autonomous loop is not yet implemented on Android</small></button><div class="android-bypass-status"><div class="android-bypass-row"><span id="androidBypassLabel">Bypass Permission</span><button id="androidBypassToggle" type="button" role="switch" aria-checked="false" aria-labelledby="androidBypassLabel" aria-describedby="androidBypassNotice" title="UI preference only; backend not active"><span class="android-bypass-track" aria-hidden="true"></span></button></div><small id="androidBypassNotice" role="status" aria-live="polite">Backend pending — bypass is not active. MCP approvals, Android permissions and safety checks remain required even when On.</small></div></div>
+                </div>
+                <span><span id="charCount">0</span> <span class="key-hint">· Enter to send · Shift+Enter for newline</span></span><button id="speechDictation" type="button" aria-label="Dictate into composer using Android speech recognizer" title="Open Android speech recognizer · may use an external speech service; does not send chat" aria-busy="false"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8"/></svg></button><span id="androidComposerProgress" class="android-composer-progress" title="Task completion only, when verifiable"><span id="androidComposerProgressRing" aria-hidden="true"></span><span id="androidComposerProgressValue">—</span></span><button id="androidComposerModel" type="button" class="android-composer-model" aria-label="Choose configured model in Settings" title="Actual configured provider and model; context usage % unavailable"><span id="androidComposerModelText">No model</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><button class="cancel-send hidden" id="cancelRequest" type="button" aria-label="Stop current AI request">Stop</button><button class="primary send" id="send" type="submit" aria-label="Send message"><span class="send-label">Send</span><svg class="send-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19 0-14m-6 6 6-6 6 6"/></svg></button>
+              </div>
+            </form>
+          </div>
+          <button type="button" class="pet-buddy hidden" id="petBuddy" aria-label="Open pet settings or drag companion" title="Drag to move pet; tap to customize"><span id="petBuddyGlyph" class="pet-buddy-glyph" aria-hidden="true">🤖</span></button>
+        </div>
+
+        <aside id="extrasPanel" class="extras-panel hidden" aria-label="Extensions and companions">
+          <div class="extras-head"><div><small>MCP AGENT AI</small><strong id="extrasTitle">Skills</strong></div><button type="button" id="extrasClose" aria-label="Close extensions panel"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+          <nav class="mobile-panel-tabs" id="extrasTabs" aria-label="Extension pages">
+            <button type="button" data-extras-tab="plugins" aria-current="false">Plugins</button>
+            <button type="button" data-extras-tab="skills" aria-current="false">Skills</button>
+            <button type="button" data-extras-tab="pets" aria-current="false">Pets</button>
+          </nav>
+          <div class="extras-body">
+            <section class="extras-section hidden" id="extrasPlugins">
+              <p class="extras-intro">Connect MCP tools and services to your agent.</p>
+              <div class="extras-summary"><div class="extras-summary-icon"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H5v5h2a2 2 0 0 1 0 4H5v6h4v-2a2 2 0 0 1 4 0v2h6v-6h-2a2 2 0 0 1 0-4h2V4h-6v2a2 2 0 0 1-4 0Z"/></svg></div><div><strong>No MCP plugins connected</strong><small>The Android MCP plugin runtime is not yet implemented. No servers have been started.</small></div></div>
+              <form id="mobileMcpConnectForm" class="mobile-mcp-form">
+                <label for="mobileMcpEndpoint">Remote MCP endpoint (HTTPS)</label>
+                <input id="mobileMcpEndpoint" type="url" autocomplete="url" spellcheck="false" placeholder="https://provider.example.com/mcp" maxlength="512" required>
+                <label for="mobileMcpToken">Bearer token (optional; memory only)</label>
+                <input id="mobileMcpToken" type="password" autocomplete="off" spellcheck="false" maxlength="4096" placeholder="Not saved on disk">
+                <div class="mobile-mcp-actions"><button id="mobileMcpConnect" type="submit">Connect</button><button id="mobileMcpDisconnect" type="button" disabled>Disconnect</button><button id="mobileMcpReload" type="button" disabled>Reload tools</button></div>
+              </form>
+              <p id="mobileMcpFeedback" class="extras-feedback" role="status" aria-live="polite"></p>
+              <div class="extras-section-label">REMOTE MCP TOOLS <span id="mobileMcpToolCount">0</span></div>
+              <div id="mobileMcpToolsList" class="mobile-mcp-tools-list"></div>
+              <label class="mcp-model-optin hidden" id="mobileMcpModelOptInRow"><input id="mobileMcpModelOptIn" type="checkbox" disabled><span>Allow AI to propose ONE MCP tool call for the next message only <small>Off by default. No tool executes until you review and approve exact arguments. Provider tool-enabled requests use bounded non-streaming.</small></span></label>
+              <form id="mobileMcpToolForm" class="mobile-mcp-form hidden">
+                <strong id="mobileMcpSelectedTool">Selected tool</strong>
+                <label for="mobileMcpArgs">JSON arguments (manual execution only)</label>
+                <textarea id="mobileMcpArgs" rows="3" maxlength="16000" spellcheck="false">{}</textarea>
+                <button type="submit">Review and run tool</button>
+              </form>
+              <pre id="mobileMcpResult" class="files-preview hidden"></pre>
+              <div class="extras-section-label">AVAILABLE NATIVE TOOLS</div>
+              <button type="button" class="extras-row" id="pluginFiles"><span class="extras-row-symbol"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v10H3zM3 7V5h7l2 2"/></svg></span><span><strong>Private files</strong><small>View app-owned files, read-only</small></span><svg class="android-ui-icon extras-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+              <button type="button" class="extras-row" id="pluginTerminal"><span class="extras-row-symbol"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/></svg></span><span><strong>App terminal</strong><small>Run bounded read-only commands</small></span><svg class="android-ui-icon extras-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+              <p class="extras-footnote">Native tools above are not third-party MCP plugins. COS Desktop additionally supports installing, enabling and configuring external MCP servers.</p>
+            </section>
+            <section class="extras-section hidden" id="extrasSkills">
+              <p class="extras-intro">Custom instructions stored locally. Enable a skill to include it with your next AI request.</p>
+              <div class="extras-section-label">MY SKILLS <span id="mobileSkillCount">0</span></div>
+              <input type="search" id="mobileSkillsSearch" class="mobile-skills-search" aria-label="Filter skills" placeholder="Search skills…" maxlength="75" autocomplete="off">
+              <div id="mobileSkillsList" class="mobile-skills-list"></div>
+              <form id="mobileSkillForm" class="mobile-skill-form">
+                <div class="extras-section-label">ADD LOCAL SKILL</div>
+                <label for="mobileSkillName">Name</label>
+                <input id="mobileSkillName" type="text" maxlength="55" placeholder="Review code" autocomplete="off" required>
+                <label for="mobileSkillInstructions">Instructions</label>
+                <textarea id="mobileSkillInstructions" rows="4" maxlength="2000" placeholder="Review correctness, edge cases and tests…" required></textarea>
+                <button type="submit">＋ Add skill</button>
+                <p class="extras-feedback" id="mobileSkillsFeedback" role="status" aria-live="polite"></p>
+              </form>
+              <form id="mobileSkillImportForm" class="mobile-mcp-form mobile-skill-import">
+                <div class="extras-section-label">IMPORT FROM APPROVED FOLDER</div>
+                <p class="extras-footnote">Select a readable folder in Files first. Only the SKILL.md you explicitly review is loaded; scripts are never executed and imported skills start disabled.</p>
+                <label for="mobileSkillImportPath">Relative Markdown file path</label>
+                <input id="mobileSkillImportPath" type="text" maxlength="256" value="SKILL.md" spellcheck="false" autocomplete="off">
+                <button id="mobileSkillImportPreviewButton" type="submit">Preview SKILL.md</button>
+                <pre id="mobileSkillImportPreview" class="files-preview hidden" aria-label="Imported skill preview"></pre>
+                <button id="mobileSkillImportApprove" class="hidden" type="button">Import reviewed skill (disabled)</button>
+                <p id="mobileSkillImportStatus" class="extras-feedback" role="status" aria-live="polite"></p>
+              </form>
+            </section>
+            <section class="extras-section hidden" id="extrasPets">
+              <p class="extras-intro">A tiny companion that stays inside your chat screen.</p>
+              <div class="pet-preview"><div class="pet-preview-glow"></div><div class="pet-preview-bot" aria-hidden="true"><span class="pet-preview-eye"></span><span class="pet-preview-eye"></span><span class="pet-preview-mouth"></span></div><strong>Your companion</strong><small>Animated inside this Android app</small></div>
+              <label class="pet-toggle-row"><span><strong>Show Pocket Bot</strong><small>Appears above the message box while chatting</small></span><input type="checkbox" id="mobilePetEnabled" aria-label="Show Pocket Bot in chat"></label>
+              <label class="pet-position-row" for="mobilePetSpecies"><span>Choose a pet</span><select id="mobilePetSpecies"><option value="bot">🤖 Robot</option><option value="cat">🐱 Cat</option><option value="dog">🐶 Dog</option><option value="fox">🦊 Fox</option><option value="rabbit">🐰 Rabbit</option><option value="panda">🐼 Panda</option><option value="dragon">🐲 Dragon</option><option value="owl">🦉 Owl</option></select></label>
+              <label class="pet-position-row" for="mobilePetPosition"><span>Position</span><select id="mobilePetPosition"><option value="right">Right side</option><option value="left">Left side</option></select></label>
+              <div id="petOverlayControls" class="mobile-mcp-form hidden">
+                <strong>Optional Android overlay</strong>
+                <small>Requires separately granted Display over other apps permission. Touch-through, foreground-only; automatically removed when this app leaves the screen. It cannot read other apps.</small>
+                <div class="mobile-mcp-actions">
+                  <button id="petOverlayShow" type="button" disabled>Show once</button>
+                  <button id="petOverlayHide" type="button" disabled>Hide</button>
+                  <button id="petOverlayRefresh" type="button">Refresh overlay status</button>
+                </div>
+                <small id="petOverlayStatus" role="status" aria-live="polite">Not checked. No overlay started.</small>
+              </div>
+              <p class="extras-footnote">Choose from eight animated in-app companions, drag one anywhere on your chat screen, or use the left/right positions. The Android system overlay is separately approved, foreground-only and never auto-starts.</p>
+            </section>
+          </div>
+        </aside>
+
+        <aside id="toolViewPanel" class="tool-view-panel hidden" aria-label="Workspace panel" data-workspace-panel="none">
+          <div class="tool-view-head"><div><small>WORKSPACE</small><strong id="toolViewTitle">Terminal</strong></div><button type="button" id="toolViewClose" aria-label="Close workspace panel"><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+          <nav class="mobile-panel-tabs mobile-work-tabs" id="toolViewTabs" aria-label="Workspace pages">
+            <button type="button" data-work-tab="review" aria-current="false">Review</button>
+            <button type="button" data-work-tab="terminal" aria-current="false">Terminal</button>
+            <button type="button" data-work-tab="files" aria-current="false">Files</button>
+            <button type="button" data-work-tab="subagents" aria-current="false">Sub-agents</button>
+          </nav>
+          <div class="tool-view-body">
+            <div id="toolReview" class="tool-view-section hidden">
+              <p class="tool-view-description">Recent conversations from this device. This is session history, not a code-diff review.</p>
+              <section id="reviewGoalProvenance" class="local-worker-history hidden" aria-label="Goal checkpoint provenance">
+                <strong>Goal checkpoint provenance</strong>
+                <p id="reviewGoalProvenanceState" role="status" aria-live="polite">Open Review to inspect a saved Goal checkpoint.</p>
+                <div id="reviewGoalProvenanceDetails" class="local-worker-history"></div>
+              </section>
+              <div id="reviewSummary" class="tool-review-summary"></div>
+              <p id="reviewExportStatus" class="files-search-status" role="status" aria-live="polite"></p>
+              <textarea id="reviewExportPreview" class="review-export-preview hidden" readonly aria-label="Conversation Markdown export" rows="7"></textarea>
+              <button id="reviewShareMarkdown" class="files-write-toggle hidden" type="button">Share reviewed Markdown with Android…</button>
+              <p id="reviewShareStatus" class="files-search-status" role="status" aria-live="polite"></p>
+            </div>
+            <div id="toolTerminal" class="tool-view-section hidden">
+              <section id="androidPtyWorkspace" class="android-pty-workspace hidden" aria-label="Android workspace terminal">
+                <div class="android-pty-toolbar">
+                  <div id="androidPtyTabs" class="android-pty-tabs" role="tablist" aria-label="Terminal sessions"></div>
+                  <button id="androidPtyNew" type="button" disabled aria-label="New terminal">+ New</button>
+                </div>
+                <div class="android-pty-status-row">
+                  <p id="androidPtyStatus" role="status" aria-live="polite">Checking Android shell support…</p>
+                  <button id="androidPtyRestart" type="button" hidden aria-label="Restart selected terminal">Restart</button>
+                </div>
+                <div id="androidPtyScreen" class="android-pty-screen" aria-label="Interactive shell output"></div>
+                <form id="androidPtyMobileForm" class="android-pty-command-form">
+                  <input id="androidPtyCommand" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type shell command" placeholder="Type command…" maxlength="4096">
+                  <button type="submit">Enter</button>
+                </form>
+                <div class="android-pty-keybar" aria-label="Terminal special keys">
+                  <button type="button" data-pty-key="escape">Esc</button>
+                  <button type="button" data-pty-key="tab">Tab</button>
+                  <button type="button" data-pty-key="up">↑</button>
+                  <button type="button" data-pty-key="down">↓</button>
+                  <button type="button" data-pty-key="left">←</button>
+                  <button type="button" data-pty-key="right">→</button>
+                  <button type="button" data-pty-key="interrupt">Ctrl+C</button>
+                  <button type="button" id="androidPtyCopy">Copy</button>
+                  <button type="button" id="androidPtyToChat">To chat</button>
+                </div>
+                <p class="android-pty-warning">Local shell: commands can change app-owned files. Run only commands you trust. This terminal does not grant AI, MCP or Goals permission to execute commands.</p>
+              </section>
+              <details id="androidTermuxDetails" class="android-termux-details">
+                <summary>Optional external Termux app</summary>
+              <section id="androidTermuxSetup" class="android-termux-setup">
+                <strong>Separate Termux terminal</strong>
+                <p id="androidTermuxStatus" role="status" aria-live="polite">Checking the installed Termux app…</p>
+                <div class="mobile-mcp-actions"><button id="androidTermuxInstall" type="button">Install Termux</button><button id="androidTermuxOpen" class="hidden" type="button">Open Termux terminal</button><button id="androidTermuxRefresh" type="button">Check setup</button></div>
+                <p>Termux runs in its own Android app and asks you to complete setup there. Mcp Agent Ai cannot run arbitrary Termux shell commands inside its own WebView. No terminal session is claimed until an external Termux window actually opens.</p>
+              </section>
+              </details>
+              <div id="terminalInspectorLegacy">
+              <p class="tool-view-description">Read-only commands inside the app's private workspace. Not an Android system shell.</p>
+              <label class="terminal-native-mode hidden" id="terminalNativeModeRow"><input id="terminalNativeMode" type="checkbox"><span>Use isolated Android-native terminal <small>Only pwd, ls, stat filename.txt, cat filename.txt inside terminal-public; no shell or external files.</small></span></label>
+              <p id="terminalNativeStatus" class="files-search-status" role="status" aria-live="polite"></p>
+              <div id="terminalOutput" class="terminal-output" role="log" aria-live="polite"></div>
+              <form id="terminalForm" class="terminal-form"><label for="terminalInput" class="terminal-prompt" aria-label="Terminal input">›</label><input id="terminalInput" type="text" maxlength="512" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="help" aria-label="Terminal command"><button type="submit">Run</button></form>
+              <button id="terminalNativeCancel" class="hidden" type="button">Stop Android command</button>
+              </div>
+            </div>
+            <div id="toolFiles" class="tool-view-section hidden">
+              <p class="tool-view-description">Browse app-private files or a folder selected in Android. Reading is the default; creating text files requires a separate explicit confirmation and stays inside the approved scope.</p>
+              <div class="android-documents-controls" id="filesSourceControls"><button id="filesSourcePrivate" type="button" aria-pressed="true">Private app files</button><button id="filesSourceSelected" type="button" aria-pressed="false">Selected folder</button></div>
+              <div id="filesPrivateView">
+              <div class="files-toolbar"><button id="filesUp" type="button">← Up</button><span id="filesPath">app://workspace/</span><button id="filesReload" type="button">↻</button></div>
+              <form id="filesSearchForm" class="files-search-form"><label for="filesSearchQuery">Find files in app workspace</label><div><input id="filesSearchQuery" type="search" maxlength="80" autocomplete="off" placeholder="File or folder name…" required><button type="submit">Search</button><button id="filesSearchClear" type="button">Clear</button></div></form>
+              <form id="filesContentSearchForm" class="files-search-form hidden"><label for="filesContentSearchQuery">Find text in app-owned user-files/ only · read-only</label><div><input id="filesContentSearchQuery" type="search" maxlength="80" autocomplete="off" spellcheck="false" placeholder="Text inside your notes…" required><button type="submit">Search text</button></div></form>
+              <p id="filesSearchStatus" class="files-search-status" role="status" aria-live="polite"></p>
+              <div id="filesList" class="files-list"></div>
+              <section id="filesInfo" class="files-info hidden" aria-label="File properties"><div class="files-info-head"><strong>Properties</strong><button id="filesInfoClose" type="button" aria-label="Close file properties">×</button></div><div id="filesInfoBody"></div><button id="filesCopyPath" type="button">Copy app-relative path</button><small id="filesCopyFeedback" role="status"></small></section>
+              <pre id="filesPreview" class="files-preview hidden"></pre>
+              <button id="filesPrivateEditToggle" class="files-write-toggle hidden" type="button" aria-expanded="false">Edit private user-files/ text</button>
+              <form id="filesPrivateWriteForm" class="mobile-mcp-form files-write-form hidden">
+                <label for="filesPrivateWriteName">File name in app-private user-files/ only</label><input id="filesPrivateWriteName" maxlength="128" autocomplete="off" spellcheck="false" placeholder="notes.txt" required>
+                <label for="filesPrivateWriteContent">UTF-8 text (64 KiB maximum)</label><textarea id="filesPrivateWriteContent" maxlength="65536" rows="4" placeholder="Type text to save…"></textarea>
+                <div class="mobile-mcp-actions"><button id="filesPrivateCreate" type="button">Create new</button><button id="filesPrivateReplace" type="button">Replace existing</button></div>
+                <small id="filesPrivateWriteStatus" role="status" aria-live="polite">No changes made.</small>
+              </form>
+              </div>
+              <div id="filesExternalView" class="android-documents-panel hidden">
+                <p>Choose a folder using Android's system picker. Read access never grants write access. Writing requires a separate system permission and an explicit confirmation.</p>
+                <button id="filesChooseFolder" type="button">Choose Android folder</button>
+                <button id="filesChooseWritableFolder" class="files-write-toggle hidden" type="button">Request folder write access</button>
+                <p id="filesExternalStatus" role="status" aria-live="polite">No selected folder</p>
+                <div class="files-toolbar"><button id="filesExternalUp" type="button">← Up</button><span id="filesExternalPath">Selected folder /</span><button id="filesExternalReload" type="button" aria-label="Reload selected folder">↻</button></div>
+                <div id="filesExternalList" class="files-list"></div>
+                <form id="filesExternalPropertiesForm" class="mobile-mcp-form hidden">
+                  <label for="filesExternalPropertiesEntry">Properties of item in selected folder (read-only)</label>
+                  <select id="filesExternalPropertiesEntry" required></select>
+                  <button type="submit">Inspect selected item properties</button>
+                  <pre id="filesExternalPropertiesResult" class="files-preview" role="status" aria-live="polite">No properties inspected.</pre>
+                </form>
+                <pre id="filesExternalPreview" class="files-preview hidden"></pre>
+                <figure id="filesExternalImagePreview" class="files-image-preview hidden" aria-label="Selected image preview"><img id="filesExternalImage" alt="Image in the selected Android folder"><figcaption>On-device selected image preview · no upload or AI attachment</figcaption></figure>
+                <form id="filesExternalCreateForm" class="mobile-mcp-form files-write-form hidden">
+                  <label for="filesExternalCreateName">New text filename in current selected folder</label><input id="filesExternalCreateName" maxlength="128" autocomplete="off" spellcheck="false" placeholder="notes.txt" required>
+                  <label for="filesExternalCreateContent">UTF-8 text (64 KiB maximum)</label><textarea id="filesExternalCreateContent" maxlength="65536" rows="4" placeholder="Type text to create…"></textarea>
+                  <button type="submit">Create text file (no overwrite)</button>
+                  <small id="filesExternalCreateStatus" role="status" aria-live="polite">No file created.</small>
+                </form>
+                <form id="filesExternalCreateFolderForm" class="mobile-mcp-form files-write-form hidden">
+                  <label for="filesExternalCreateFolderName">New folder name in selected folder</label><input id="filesExternalCreateFolderName" maxlength="128" autocomplete="off" spellcheck="false" placeholder="New folder" required>
+                  <button type="submit">Create new folder (no overwrite)</button>
+                  <small id="filesExternalCreateFolderStatus" role="status" aria-live="polite">No folder created.</small>
+                </form>
+                <form id="filesExternalRenameForm" class="mobile-mcp-form files-write-form hidden">
+                  <label for="filesExternalRenameEntry">Existing item in the selected folder</label><select id="filesExternalRenameEntry" required></select>
+                  <label for="filesExternalRenameName">New name (same folder, no overwrite)</label><input id="filesExternalRenameName" maxlength="128" autocomplete="off" spellcheck="false" placeholder="New item name" required>
+                  <button type="submit">Rename selected item once</button>
+                  <small id="filesExternalRenameStatus" role="status" aria-live="polite">No item renamed.</small>
+                </form>
+              </div>
+            </div>
+            <div id="toolSubagents" class="tool-view-section hidden">
+              <section id="androidPrimeOverview" class="android-prime-overview" aria-label="Prime worker overview">
+                <div class="android-prime-overview-top"><strong id="androidPrimeActiveCount" role="status">Active · 0 / 2</strong>
+                  <div class="android-prime-options">
+                    <button type="button" id="androidPrimeOptionsToggle" aria-label="Sub-agents options" aria-expanded="false" aria-controls="androidPrimeOptionsMenu">⋮</button>
+                    <div id="androidPrimeOptionsMenu" class="android-prime-options-menu hidden" role="menu">
+                      <button type="button" role="menuitem" data-prime-option="refresh">Refresh worker status</button>
+                      <button type="button" role="menuitem" data-prime-option="manage">Prime &amp; worker controls</button>
+                      <button type="button" role="menuitem" data-prime-option="copy">Copy verified status</button>
+                    </div>
+                  </div>
+                </div>
+                <p id="androidPrimeOverviewState" class="android-prime-overview-state" role="status">Checking native workers…</p>
+                <div id="androidPrimeActiveRows" class="android-prime-overview-rows" aria-label="Active Prime workers"></div>
+                <div class="android-prime-history-title"><strong>History</strong><span id="androidPrimeHistoryCount">0</span></div>
+                <div id="androidPrimeHistoryRows" class="android-prime-overview-rows" aria-label="Prime worker history"></div>
+              </section>
+              <details id="androidPrimeAdvanced" class="android-prime-advanced">
+                <summary>Prime &amp; worker controls</summary>
+              <section id="mobilePrimeSection" class="mobile-goal-section android-prime-section" aria-label="Prime agent and AI workers">
+                <div class="android-prime-heading"><div><small>ANDROID AGENT COORDINATOR</small><strong>Prime · Multi-worker</strong></div><span id="mobilePrimeCapacity" class="android-prime-capacity">Up to 2 workers</span></div>
+                <p class="tool-view-description">Prime organizes one goal and up to two real AI worker tasks. Each provider call requires your explicit approval; workers cannot silently run commands, browse other apps or access credentials.</p>
+                <p id="mobilePrimeFeedback" role="status" aria-live="polite">Checking native Prime workspace…</p>
+                <form id="mobilePrimeCreateForm" class="mobile-mcp-form">
+                  <label for="mobilePrimeObjective">Prime objective</label>
+                  <textarea id="mobilePrimeObjective" rows="2" maxlength="700" placeholder="Describe the goal Prime should coordinate" required></textarea>
+                  <button type="submit" disabled>Create Prime session</button>
+                </form>
+                <div id="mobilePrimeCurrent" class="hidden android-prime-current">
+                  <div class="android-prime-summary"><strong id="mobilePrimeHeadline">Prime session</strong><small id="mobilePrimeState">Checking workers…</small></div>
+                  <form id="mobilePrimeWorkerForm" class="mobile-mcp-form">
+                    <label for="mobilePrimeWorkerRole">Worker role</label>
+                    <select id="mobilePrimeWorkerRole"><option value="research">Research</option><option value="code">Code</option><option value="review">Review</option><option value="qa">QA</option></select>
+                    <label for="mobilePrimeWorkerTask">Task for worker</label>
+                    <textarea id="mobilePrimeWorkerTask" rows="2" maxlength="650" required placeholder="Give this worker one bounded task"></textarea>
+                    <button type="submit" disabled>Run worker (AI provider)</button>
+                  </form>
+                  <div id="mobilePrimeWorkerList" class="local-worker-history" aria-label="Prime worker results"></div>
+                  <label for="mobilePrimeSummary">Your final summary (not auto-verified)</label>
+                  <textarea id="mobilePrimeSummary" rows="2" maxlength="1000" placeholder="Review the worker reports and write your own conclusion"></textarea>
+                  <div class="mobile-mcp-actions"><button id="mobilePrimeRefresh" type="button">Refresh workers</button><button id="mobilePrimeFinish" type="button" class="outline">Finish Prime</button><button id="mobilePrimeCancel" type="button" class="outline">Cancel Prime</button></div>
+                </div>
+              </section>
+              <div class="tool-status-icon" aria-hidden="true"><svg class="android-ui-icon" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 7V4m-3 0h6M8 13h.01M16 13h.01M9 17h6"/></svg></div>
+              <strong>Local workspace workers</strong>
+              <p class="tool-view-description">Real, bounded read-only background jobs (up to 2). These are not separate AI models or COS Desktop's AI sub-agents. They cannot access external phone storage, run shell commands or send network requests.</p>
+              <strong id="localWorkerStats">Checking local workers…</strong>
+              <form id="localWorkerForm" class="mobile-mcp-form">
+                <label for="localWorkerAction">Job</label>
+                <select id="localWorkerAction"><option value="list">List private agent folder</option><option value="search_names">Search private agent filenames</option><option value="read">Read private agent text file</option><option value="properties">Private file properties</option></select>
+                <label for="localWorkerTarget">Relative path or filename search</label>
+                <input id="localWorkerTarget" type="text" maxlength="80" placeholder="Optional for list">
+                <button type="submit">Start local job</button>
+              </form>
+              <button type="button" id="localWorkerRefresh" class="outline">Refresh local worker jobs</button>
+              <p id="localWorkerFeedback" role="status" aria-live="polite"></p>
+              <div id="localWorkerHistory" class="local-worker-history"></div>
+              <section id="mobileAiDelegates" class="mobile-goal-section">
+                <strong>AI delegates · Android</strong>
+                <p class="tool-view-description">Send one explicitly approved task to the selected configured AI provider/model. Up to 2 concurrent requests; provider billing may apply. No automatic runs, replay or background polling.</p>
+                <p id="mobileAiDelegateStats" role="status" aria-live="polite">Checking saved delegate jobs…</p>
+                <form id="mobileAiDelegateForm" class="mobile-mcp-form">
+                  <label for="mobileAiDelegateTask">One task for the selected provider/model</label>
+                  <textarea id="mobileAiDelegateTask" rows="3" maxlength="2000" placeholder="Describe one bounded task…" required></textarea>
+                  <button type="submit" disabled>Run one AI delegate</button>
+                </form>
+                <div class="mobile-mcp-actions"><button id="mobileAiDelegateRefresh" type="button">Refresh delegate jobs</button></div>
+                <p id="mobileAiDelegateFeedback" role="status" aria-live="polite"></p>
+                <div id="mobileAiDelegateJobs" class="local-worker-history"></div>
+              </section>
+              <section id="mobileGoalSection" class="mobile-goal-section">
+                <strong>Goal checkpoints</strong>
+                <p class="tool-view-description">Track Goal steps with manual review and approvals. ChatGPT can help you plan in the main chat; you record completed steps after checking their results.</p>
+                <p class="android-chatgpt-goal-note">ChatGPT-only mode uses the signed-in website for chat. Direct API-powered AI delegates, automatic Goal drafts and AI Goal runs are unavailable.</p>
+                <form id="mobileGoalCreate" class="mobile-mcp-form">
+                  <label for="mobileGoalTitle">Goal title</label><input id="mobileGoalTitle" type="text" maxlength="200" required placeholder="Review my project">
+                  <label for="mobileGoalSteps">Steps (one per line, 1–16)</label><textarea id="mobileGoalSteps" rows="4" maxlength="3000" required placeholder="Inspect structure&#10;Run tests&#10;Review results"></textarea>
+                  <div id="mobileGoalApprovalReview" class="local-worker-history hidden" aria-label="Review step approvals">
+                    <strong>Review each step’s approval requirement</strong>
+                    <div id="mobileGoalApprovalRows" class="local-worker-history"></div>
+                    <p id="mobileGoalApprovalSummary" role="status" aria-live="polite">No steps to review.</p>
+                  </div>
+                  <label for="mobileGoalTurns">Turn budget (1–64)</label><input id="mobileGoalTurns" type="number" min="1" max="64" value="12" required>
+                  <div id="mobileGoalRetryControls" class="hidden">
+                    <label for="mobileGoalRetries">Retries permitted per step (0–5)</label>
+                    <input id="mobileGoalRetries" type="number" min="0" max="5" step="1" value="2" required>
+                  </div>
+                  <button type="submit">Create checkpointed goal</button>
+                </form>
+                <div id="mobileGoalDraftControls" class="mobile-mcp-form">
+                  <label for="mobileGoalDraftObjective">Objective for AI draft (maximum 1000 UTF-8 bytes)</label>
+                  <textarea id="mobileGoalDraftObjective" rows="2" maxlength="1000" placeholder="Describe the goal you want to plan; review every suggestion before creating…" spellcheck="true"></textarea>
+                  <button id="mobileGoalDraftButton" type="button" disabled>Draft steps with AI</button>
+                  <p id="mobileGoalDraftFeedback" class="extras-feedback" role="status" aria-live="polite">Drafting is optional. It will never create or run a goal.</p>
+                </div>
+                <div id="mobileGoalActive" class="hidden">
+                  <strong id="mobileGoalHeadline">Saved goal</strong>
+                  <p id="mobileGoalProgress" role="status" aria-live="polite"></p>
+                  <div id="mobileGoalStepsList" class="local-worker-history"></div>
+                  <div id="mobileGoalStartActions" class="mobile-mcp-actions"><button id="mobileGoalBegin" type="button">Begin manual step</button><button id="mobileGoalRunAi" type="button" disabled>Run one AI step</button><button id="mobileGoalStopAi" class="hidden" type="button">Stop active AI Goal request</button><button id="mobileGoalInterrupt" type="button">Mark turn interrupted</button></div>
+                  <label id="mobileGoalDelegateControls" class="mobile-mcp-form hidden"><span><input id="mobileGoalDelegateOptIn" type="checkbox"> Run this ONE Goal AI step through a bounded native AI Sub-agent (2 concurrent maximum). The task and provider answer are saved privately to the Sub-agents history; no tools, auto-run or nested delegation.</span></label>
+                  <label id="mobileGoalMcpControls" class="mobile-mcp-form hidden"><span><input id="mobileGoalMcpOptIn" type="checkbox"> Allow this ONE Goal AI request to propose one connected MCP tool. You must separately inspect the exact name and arguments, then approve or reject. No automatic tool call or step completion.</span></label>
+                  <section id="mobileGoalMcpReview" class="mobile-mcp-form hidden" aria-label="Pending Goal MCP tool review">
+                    <strong>Goal MCP proposal · approval required</strong>
+                    <p id="mobileGoalMcpReviewState" class="extras-feedback" role="status" aria-live="polite"></p>
+                    <p id="mobileGoalMcpReviewName" class="files-search-status"></p>
+                    <pre id="mobileGoalMcpReviewArguments" class="files-preview" aria-label="Exact proposed MCP tool arguments"></pre>
+                    <div class="mobile-mcp-actions"><button id="mobileGoalMcpApprove" type="button">Approve this tool once</button><button id="mobileGoalMcpReject" type="button">Reject tool</button></div>
+                  </section>
+                  <div id="mobileGoalOutcome" class="mobile-mcp-form hidden">
+                    <label for="mobileGoalEvidence">Actual step outcome / evidence</label>
+                    <textarea id="mobileGoalEvidence" rows="3" maxlength="1024" placeholder="Describe the actual verified result"></textarea>
+                    <div class="mobile-mcp-actions"><button type="button" data-goal-outcome="completed">Record completed</button><button type="button" data-goal-outcome="retryable">Retry needed</button><button type="button" data-goal-outcome="terminal">Stop with error</button><button type="button" data-goal-outcome="approval">Request approval</button></div>
+                  </div>
+                  <div id="mobileGoalApproval" class="mobile-mcp-actions hidden"><button type="button" data-goal-approval="true">Approve this step</button><button type="button" data-goal-approval="false">Reject this step</button></div>
+                  <div class="mobile-mcp-actions"><button id="mobileGoalPause" type="button">Pause</button><button id="mobileGoalResume" type="button">Resume</button><button id="mobileGoalCancel" type="button">Cancel goal</button><button id="mobileGoalArchive" type="button">Archive finished goal</button><button id="mobileGoalReload" type="button">Refresh</button></div>
+                </div>
+                <p id="mobileGoalFeedback" class="extras-feedback" role="status" aria-live="polite"></p>
+              </section>
+              </details>
+            </div>
+          </div>
+        </aside>
+
+        <aside id="settingsPanel" class="settings hidden" aria-label="Workspace customization" data-settings-view="general" data-settings-nav-open="true">
+          <div id="androidSettingsNav" class="android-settings-nav" aria-label="Settings sidebar">
+          <div class="settings-head"><div><span class="panel-eyebrow">YOUR WORKSPACE</span><strong>Settings</strong><small>Connections and capabilities, in one place.</small></div><button type="button" class="icon-btn" id="settingsClose" aria-label="Close settings"><span class="desktop-close-icon" aria-hidden="true">✕</span><svg class="android-ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg><span class="android-settings-exit-label">Back to chat</span></button></div>
+          <div id="androidSettingsDirectory" class="android-settings-directory">
+            <label class="android-settings-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></svg><input id="androidSettingsSearch" type="search" placeholder="Search settings..." autocomplete="off" aria-label="Search settings" maxlength="80"></label>
+            <nav id="androidSettingsCategories" aria-label="Settings categories">
+              <button type="button" data-android-settings-category="workspace"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8v10h-7v-7h-4v7H3z"/></svg>Workspace</button>
+              <button type="button" data-android-settings-category="general"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6m8 4v6"/><circle cx="8" cy="7" r="2"/><circle cx="16" cy="17" r="2"/></svg>General</button>
+              <button type="button" data-android-settings-category="usage"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4v16h18M5 15l5-5 4 3 6-7"/></svg>Usage</button>
+              <button type="button" data-android-settings-category="setup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-16 5h16m-16 5h16M8 5v4m8 1v4m-6 1v4"/></svg>Setup</button>
+              <button type="button" data-android-settings-category="plugins"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H5v5h2a2 2 0 0 1 0 4H5v6h4v-6h-2a2 2 0 0 1 0-4h2V4h-6v2a2 2 0 0 0-4 0Z"/></svg>Plugins</button>
+              <button type="button" data-android-settings-category="agents"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="13" rx="3"/><path d="M12 3v4M9 3h6M8 12h.01M16 12h.01M8 16h8"/></svg>Agents &amp; automation</button>
+              <button type="button" data-android-settings-category="appearance"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/></svg>Appearance</button>
+              <button type="button" data-android-settings-category="activity"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h5l3-7 4 14 3-7h5"/></svg>Activity</button>
+            </nav>
+            <p id="androidSettingsNoResults" class="android-settings-empty hidden" role="status">No matching settings.</p>
+          </div>
+          </div>
+          <div id="androidSettingsContent" class="android-settings-content">
+          <div id="androidSettingsDetailHead" class="android-settings-detail-head">
+            <button type="button" id="androidSettingsBack" aria-label="Show settings categories" aria-controls="androidSettingsNav" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"/></svg>Settings</button>
+            <div><h1 id="androidSettingsDetailTitle" tabindex="-1">General</h1><p id="androidSettingsDetailDescription">How the app behaves day to day. Changes apply immediately.</p></div>
+          </div>
+          <section id="androidCosSetupWizard" class="setting-group android-cos-setup-wizard" data-setting-category="setup" aria-labelledby="androidCosSetupTitle">
+            <div class="setting-group-title android-setup-heading"><div><span class="android-setup-eyebrow">YOUR PHONE · QUICK SETUP</span><h2 id="androidCosSetupTitle">Set up Mcp Agent Ai</h2><p class="android-cos-setup-tagline">10 steps. One connected phone.</p></div></div>
+            <div id="androidCosSetupProgress" class="android-cos-setup-progress" role="progressbar" aria-label="Completed setup steps" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0"><span id="androidCosSetupProgressText">Checking setup…</span><span class="android-cos-setup-progress-track" aria-hidden="true"><span id="androidCosSetupProgressFill"></span></span></div>
+            <p id="androidCosSetupChecking" class="android-cos-setup-checking" role="status" aria-live="polite" hidden><span class="android-cos-setup-spinner" aria-hidden="true"></span> Checking setup status…</p>
+            <nav id="androidCosSetupSteps" class="android-cos-setup-steps" aria-label="App setup steps">
+              <button type="button" data-cos-setup-step="access" aria-current="step"><span>1. Permissions</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="extension"><span>2. Extensions</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="browser"><span>3. Browser</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="folder"><span>4. Folder</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="tools"><span>5. Access</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="tunnel"><span>6. Tunnel</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="key"><span>7. API key</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="connect"><span>8. Connect</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="mcpPlugin"><span>9. MCP Plugin</span><small>Check</small></button>
+              <button type="button" data-cos-setup-step="ready"><span>10. Ready</span><small>Check</small></button>
+            </nav>
+            <div id="androidCosSetupCurrent" class="android-cos-setup-current" aria-live="polite">
+              <h3 id="androidCosSetupStepTitle">1. Permissions</h3>
+              <p id="androidCosSetupStepDescription">Allow each supported persistent permission in Android Settings, then check its status.</p>
+              <p id="androidCosSetupStepState" class="connection-note" role="status">Checking…</p>
+              <button type="button" id="androidCosSetupStepAction" class="outline">Open browser controls</button>
+              <div id="androidCosExtensionControls" class="android-cos-extension-controls hidden" role="group" aria-label="Android extensions">
+                <div class="android-cos-extension-intro android-cos-step-header">
+                  <span class="android-cos-extension-eyebrow android-cos-step-eyebrow">STEP 02 · EXTENSIONS</span>
+                  <h3 class="android-cos-step-title">Manage your extensions</h3>
+                  <p>Extensions for the built-in browser.</p>
+                </div>
+                <div class="android-cos-extension-actions">
+                  <button id="androidCosExtensionOpen" type="button" class="android-cos-extension-action android-cos-extension-action-manage">
+                    <span class="android-cos-extension-action-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4h1.3a2.7 2.7 0 1 1 0 5.4H3V19a2 2 0 0 0 2 2h4v-1.3a2.7 2.7 0 1 1 5.4 0V21H19a2 2 0 0 0 2-2v-4h-1.3a2.7 2.7 0 1 1 0-5.4H21V5a2 2 0 0 0-2-2h-4v1.3a2.7 2.7 0 1 1-5.4 0V3Z"/></svg>
+                    </span>
+                    <span class="android-cos-extension-action-copy">
+                      <strong>Open Extensions</strong>
+                      <small>View and manage</small>
+                    </span>
+                    <svg class="android-cos-extension-action-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                  <button id="androidCosExtensionInstall" type="button" class="android-cos-extension-action android-cos-extension-action-install">
+                    <span class="android-cos-extension-action-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                    </span>
+                    <span class="android-cos-extension-action-copy">
+                      <strong>Install Extension</strong>
+                      <small>Add bundled add-on</small>
+                    </span>
+                    <svg class="android-cos-extension-action-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                </div>
+                <div class="android-cos-extension-status-row">
+                  <span class="android-cos-extension-status-dot" aria-hidden="true"></span>
+                  <p id="androidCosExtensionStatus" role="status" aria-live="polite">Checking installed extensions…</p>
+                </div>
+              </div>
+              <div id="androidCosBrowserChoices" class="android-cos-browser-controls hidden" role="group" aria-label="Sign in with ChatGPT app authorization">
+                <div class="android-cos-browser-intro android-cos-step-header">
+                  <span class="android-cos-extension-eyebrow android-cos-step-eyebrow">STEP 03 · BROWSER</span>
+                  <h3 class="android-cos-step-title">Authorize Mcp Agent Ai</h3>
+                  <p>Sign in, approve <strong>Mcp Agent Ai</strong>, then bring your session back.</p>
+                </div>
+                <div class="android-cos-browser-actions">
+                  <button id="androidCosBrowserOpen" type="button" class="android-cos-browser-action">
+                    <span class="android-cos-browser-action-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18m-9 4v4m-2-2h4"/></svg>
+                    </span>
+                    <span class="android-cos-browser-action-copy"><strong>Sign in to ChatGPT</strong><small>Secure Android browser</small></span>
+                    <svg class="android-cos-browser-action-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                  <button id="androidCosBrowserBring" type="button" class="android-cos-browser-action android-cos-browser-action-bring" disabled>
+                    <span class="android-cos-browser-action-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h11m-4-4 4 4-4 4"/><rect x="15" y="3" width="6" height="18" rx="2"/></svg>
+                    </span>
+                    <span class="android-cos-browser-action-copy"><strong>Bring Session</strong><small>Confirm your account</small></span>
+                    <svg class="android-cos-browser-action-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                </div>
+                <div class="android-cos-browser-status-row" data-state="waiting">
+                  <span class="android-cos-extension-status-dot" aria-hidden="true"></span>
+                  <p id="androidCosBrowserSignInStatus" role="status" aria-live="polite">Waiting for the native OpenAI account authorization.</p>
+                </div>
+                <details class="android-setup-more"><summary>About ChatGPT sign-in</summary><p class="android-cos-browser-login-note">OpenAI confirms your account securely. No Chrome cookies or website chats are imported.</p></details>
+              </div>
+              <div id="androidCosFolderPanel" class="android-cos-folder-panel hidden" role="group" aria-label="Android storage and folders">
+                <header class="android-cos-folder-head android-cos-step-header">
+                  <span class="android-cos-folder-eyebrow android-cos-step-eyebrow">STEP 04 · FOLDER</span>
+                  <h3 class="android-cos-step-title">Choose your folder</h3>
+                  <p>Choose where this app works with files.</p>
+                </header>
+                <div class="android-cos-folder-drive" id="androidCosMainDrive">
+                  <span class="android-cos-folder-drive-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M7 14h10"/></svg></span>
+                  <span class="android-cos-folder-drive-copy"><strong>Internal storage</strong><small id="androidCosMainPath">Checking Android storage…</small></span>
+                  <span class="android-cos-folder-drive-state" id="androidCosMainState" data-state="checking">Checking</span>
+                </div>
+                <div class="android-cos-folder-selection">
+                  <div class="android-cos-folder-selected-copy"><strong>Current folder</strong><small id="androidCosSelectedPath" role="status">Checking selected folder…</small></div>
+                  <button type="button" id="androidCosFolderReset" class="android-cos-folder-reset">Reset</button>
+                </div>
+                  <button type="button" id="androidCosFolderBrowse" class="android-cos-folder-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18M5 4h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg><span><strong>Select folder</strong><small>Choose a folder inside Internal storage</small></span><span aria-hidden="true">›</span></button>
+                <div id="androidCosFolderExplorer" class="android-cos-folder-explorer hidden" aria-label="Shared storage folder browser">
+                  <div class="android-cos-folder-explorer-bar"><button id="androidCosFolderUp" type="button" aria-label="Up one folder">↑</button><span id="androidCosFolderCurrentPath">Internal storage</span><button id="androidCosFolderReload" type="button" aria-label="Reload folders">↻</button></div>
+                  <div id="androidCosFolderEntries" class="android-cos-folder-entries" role="list"><p>Select a folder to browse.</p></div>
+                  <div class="android-cos-folder-apply"><small id="androidCosFolderCandidate">/storage/emulated/0</small><button type="button" id="androidCosFolderSet">Set folder</button></div>
+                </div>
+                <p id="androidCosFolderStatus" class="android-cos-folder-note" role="status" aria-live="polite">Checking the phone's shared storage…</p>
+                  <div class="android-cos-folder-footer"><span>Android keeps protected folders private.</span><button type="button" id="androidCosFolderNext">Continue <span aria-hidden="true">→</span></button></div>
+              </div>
+              <div id="androidCosAccessPanel" class="android-cos-setup-substage hidden" role="group" aria-label="Android MCP tool access permissions">
+                <section id="androidMcpAccessPresets" class="android-mcp-access" aria-labelledby="androidMcpAccessTitle">
+                  <header class="android-mcp-access-head android-cos-step-header">
+                    <span class="android-mcp-access-eyebrow android-cos-step-eyebrow">STEP 05 · ACCESS</span>
+                    <h3 id="androidMcpAccessTitle" class="android-cos-step-title">Choose what ChatGPT can do</h3>
+                    <p>Choose which tools ChatGPT can request.</p>
+                  </header>
+                  <fieldset class="android-mcp-presets" aria-describedby="androidMcpAccessHelp">
+                    <legend>Access preset</legend>
+                    <label class="android-mcp-preset">
+                      <input type="radio" name="androidMcpAccessPreset" value="full" aria-describedby="androidMcpAccessHelp">
+                      <span class="android-mcp-preset-copy">
+                        <strong>Full access</strong>
+                        <small>File, terminal and supported browser tools.</small>
+                      </span>
+                    </label>
+                    <label class="android-mcp-preset">
+                      <input type="radio" name="androidMcpAccessPreset" value="files_terminal" aria-describedby="androidMcpAccessHelp">
+                      <span class="android-mcp-preset-copy">
+                        <strong>Files and terminal</strong>
+                        <small>Files and terminal, without browser control.</small>
+                      </span>
+                    </label>
+                    <label class="android-mcp-preset">
+                      <input type="radio" name="androidMcpAccessPreset" value="read_only" aria-describedby="androidMcpAccessHelp">
+                      <span class="android-mcp-preset-copy">
+                        <strong>Read only</strong>
+                        <small>Read approved files. No changes.</small>
+                      </span>
+                    </label>
+                  </fieldset>
+                  <details class="android-mcp-fine-tune">
+                    <summary><span>Fine-tune permissions</span><small>Advanced tool access &amp; automation</small></summary>
+                    <div class="android-mcp-fine-tune-body">
+                      <p class="android-mcp-fine-tune-intro">Choose what tools may request access, then set how automation runs. Modes are preferences, not extra permissions; Android verifies supported capabilities.</p>
+                      <details class="android-mcp-permission-group" open>
+                        <summary><span>Look at files</span><small>Folders, search, reading, metadata</small></summary>
+                        <div class="android-mcp-permission-body">
+                          <label class="android-mcp-group-choice" for="androidMcpAllowLook">
+                            <input id="androidMcpAllowLook" type="checkbox">
+                            <span>Request file inspection</span>
+                          </label>
+                          <div class="android-mcp-capability-list">
+                            <label class="android-mcp-capability"><input type="checkbox" data-mcp-capability="browseFolders"><span><strong>Browse folders</strong><small>List folders in approved storage.</small></span></label>
+                            <label class="android-mcp-capability"><input type="checkbox" data-mcp-capability="searchFiles"><span><strong>Search files</strong><small>Find files within allowed locations.</small></span></label>
+                            <label class="android-mcp-capability"><input type="checkbox" data-mcp-capability="readFiles"><span><strong>Read files</strong><small>View supported file contents without changing them.</small></span></label>
+                            <label class="android-mcp-capability"><input type="checkbox" data-mcp-capability="fileMetadata"><span><strong>File metadata</strong><small>Inspect names, sizes and other supported details.</small></span></label>
+                          </div>
+                        </div>
+                      </details>
+                      <details class="android-mcp-permission-group">
+                        <summary><span>Change files</span><small>Create, edit, move, delete</small></summary>
+                        <div class="android-mcp-permission-body">
+                          <label class="android-mcp-group-choice" for="androidMcpAllowChange">
+                            <input id="androidMcpAllowChange" type="checkbox">
+                            <span>Request file changes</span>
+                          </label>
+                          <div class="android-mcp-capability-list">
+                            <label class="android-mcp-capability"><input type="checkbox" data-mcp-capability="createFiles"><span><strong>Create files</strong><small>Create content only in approved locations.</small></span></label>
+                            <label class="android-mcp-capability"><input type="checkbox" data-mcp-capability="editFiles"><span><strong>Edit files</strong><small>Modify content after applicable checks and confirmation.</small></span></label>
+                            <label class="android-mcp-capability"><input type="checkbox" data-mcp-capability="moveFiles"><span><strong>Move or rename</strong><small>Relocate or rename files where permitted.</small></span></label>
+                            <label class="android-mcp-capability"><input type="checkbox" data-mcp-capability="deleteFiles"><span><strong>Delete files</strong><small>Destructive actions need explicit confirmation.</small></span></label>
+                          </div>
+                          <div class="android-mcp-file-tools" role="group" aria-label="Native Android file tools">
+                            <p>Native MCP tools · available only when the backend confirms the corresponding file capability</p>
+                            <div class="android-mcp-file-tool-list">
+                              <span class="android-mcp-file-tool" data-file-tool="files/create" data-capability="createFiles" data-state="checking"><code>files/create</code><small>Checking…</small></span>
+                              <span class="android-mcp-file-tool" data-file-tool="files/edit" data-capability="editFiles" data-state="checking"><code>files/edit</code><small>Checking…</small></span>
+                              <span class="android-mcp-file-tool" data-file-tool="files/apply_patch" data-capability="editFiles" data-state="checking"><code>files/apply_patch</code><small>Checking…</small></span>
+                              <span class="android-mcp-file-tool" data-file-tool="files/move" data-capability="moveFiles" data-state="checking"><code>files/move</code><small>Checking…</small></span>
+                              <span class="android-mcp-file-tool" data-file-tool="files/delete" data-capability="deleteFiles" data-state="checking"><code>files/delete</code><small>Checking…</small></span>
+                            </div>
+                            <p class="android-mcp-file-tool-note"><code>files/apply_patch</code> uses exact-replace edits in approved locations, not arbitrary shell patch commands. File changes still require the applicable native access and approvals.</p>
+                          </div>
+                        </div>
+                      </details>
+                      <details id="androidAutomationModesGroup" class="android-mcp-permission-group android-mcp-automation-group">
+                        <summary><span>Automation modes</span><small>Browser &amp; Android app</small></summary>
+                        <div class="android-mcp-permission-body">
+                          <p class="android-mcp-automation-hint">Select how ChatGPT uses an approved browser or app session. Changing a mode does not start any browser, capture a screen, or grant tool access.</p>
+                          <section id="androidAutomationSettings" class="android-automation-settings" aria-label="Automation mode preferences">
+                            <div class="android-automation-mode-card">
+                              <div class="android-automation-mode-heading">
+                                <strong>Browser automation</strong>
+                                <span id="androidAutomationBrowserBadge" data-state="checking">Checking…</span>
+                              </div>
+                              <label for="androidAutomationBrowserMode">Browser mode</label>
+                              <select id="androidAutomationBrowserMode">
+                                <option value="headless">Headless browser</option>
+                                <option value="right_sidebar">Right sidebar</option>
+                                <option value="open_browser_app">Open browser app (Chrome)</option>
+                              </select>
+                              <p id="androidAutomationBrowserDescription" class="android-automation-mode-description">Runs a separate WebView without opening Chrome.</p>
+                              <p class="android-automation-mode-description">Choose a browser mode here; the chat decides which website to open when you request it.</p>
+                              <p id="androidAutomationBrowserStatus" class="android-automation-mode-status" role="status" aria-live="polite">Checking browser capability…</p>
+                            </div>
+                            <div class="android-automation-mode-card">
+                              <div class="android-automation-mode-heading">
+                                <strong>Android app automation</strong>
+                                <span id="androidAutomationAppBadge" data-state="checking">Checking…</span>
+                              </div>
+                              <label for="androidAutomationAppMode">Android mode</label>
+                              <select id="androidAutomationAppMode">
+                                <option value="realtime">RealTime Screen</option>
+                                <option value="screenshot_click">Screenshot &amp; click</option>
+                              </select>
+                              <p id="androidAutomationAppDescription" class="android-automation-mode-description">If an app does not support realtime actions, the agent may fall back to screenshot &amp; click when Android grants capture and gesture permissions. The selected dropdown will not change.</p>
+                              <p id="androidAutomationAppStatus" class="android-automation-mode-status" role="status" aria-live="polite">Checking Accessibility and screen-control capabilities…</p>
+                            </div>
+                          </section>
+                          <div class="android-mcp-automation-permission">
+                            <label class="android-mcp-group-choice" for="androidMcpAllowBrowser">
+                              <input id="androidMcpAllowBrowser" type="checkbox" data-mcp-capability="browserControl">
+                              <span>Allow browser tool access</span>
+                            </label>
+                            <p>This is a separate native MCP permission request, not a browser-mode switch. Supported Android browser routes are checked by the backend.</p>
+                          </div>
+                        </div>
+                      </details>
+                      <details id="androidMcpRunProgramsGroup" class="android-mcp-permission-group">
+                        <summary><span>Run programs</span><small>Android terminal routes</small></summary>
+                        <div class="android-mcp-permission-body">
+                          <label class="android-mcp-group-choice" for="androidMcpAllowTerminal">
+                            <input id="androidMcpAllowTerminal" type="checkbox" data-mcp-capability="terminal">
+                            <span>Allow supported terminal tools</span>
+                          </label>
+                          <p>Requests supported Android terminal actions only when the native backend permits them. No root access or unrestricted command editing is implied.</p>
+                          <section class="android-mcp-command-rules" aria-labelledby="androidMcpCommandRulesTitle">
+                            <header>
+                              <strong id="androidMcpCommandRulesTitle">Allowed commands</strong>
+                              <small>Android native terminal · supported read-only actions only</small>
+                            </header>
+                            <label class="android-mcp-command-rules-limit" for="androidMcpCommandRulesEnabled">
+                              <input id="androidMcpCommandRulesEnabled" type="checkbox" disabled>
+                              <span><strong>Limit command launches</strong><small>Requires saved native rules and the separate terminal tool permission.</small></span>
+                            </label>
+                            <fieldset id="androidMcpCommandRulesModes" class="android-mcp-command-rules-modes" disabled>
+                              <legend>Rule mode</legend>
+                              <label><input type="radio" name="androidMcpCommandRulesMode" value="allowlist" checked><span>Allowlist</span></label>
+                              <label><input type="radio" name="androidMcpCommandRulesMode" value="denylist"><span>Denylist</span></label>
+                            </fieldset>
+                            <label class="android-mcp-command-rules-label" for="androidMcpCommandRulesInput">Command patterns · one per line</label>
+                            <textarea id="androidMcpCommandRulesInput" rows="5" maxlength="256" spellcheck="false" autocomplete="off" placeholder="pwd&#10;ls&#10;stat *&#10;cat *" aria-describedby="androidMcpCommandRulesHelp androidMcpCommandRulesStatus" disabled></textarea>
+                            <p id="androidMcpCommandRulesHelp" class="android-mcp-command-rules-help">Only <code>pwd</code>, <code>ls</code>, <code>stat *</code> and <code>cat *</code> are supported. The asterisk is a native file-path argument pattern, not a shell wildcard. Denylist can only exclude these supported actions; it does not permit other commands. Editing rules never runs a command.</p>
+                            <div class="android-mcp-command-rules-footer">
+                              <button id="androidMcpCommandRulesSave" type="button" disabled>Save command rules</button>
+                              <p id="androidMcpCommandRulesStatus" role="status" aria-live="polite" data-state="checking">Checking native command rules… No remote command access is assumed.</p>
+                            </div>
+                          </section>
+                        </div>
+                      </details>
+                      <details class="android-mcp-permission-group android-mcp-subagents-group">
+                        <summary><span>Sub-agents</span><small>Delegated work</small></summary>
+                        <div class="android-mcp-permission-body">
+                          <p>Native AI Sub-agents are managed in the Sub-agents workspace; delegation still requires explicit approval.</p>
+                          <p class="android-mcp-automation-hint">This section is informational. There is no separate Android MCP permission switch for Sub-agents.</p>
+                        </div>
+                      </details>
+                    </div>
+                  </details>
+                  <p id="androidMcpAccessStatus" class="android-mcp-access-status" role="status" aria-live="polite">Requested only — remote tools are not yet exposed or verified. Selecting a preset does not grant access.</p>
+                  <details class="android-setup-more android-mcp-access-details">
+                    <summary>How access works</summary>
+                    <p id="androidMcpAccessHelp" class="android-mcp-access-help">Your choices request access to supported tools. Android still checks permissions, and file changes may require your approval.</p>
+                  </details>
+                </section>
+              </div>
+              <div id="androidCosTunnelMethod" class="android-cos-setup-substage hidden" role="group" aria-label="Core tunnel setup">
+                <section class="android-tunnel-setup-section" aria-labelledby="androidTunnelCreateTitle">
+                  <header class="android-tunnel-setup-heading android-cos-step-header">
+                    <span class="android-cos-step-eyebrow">STEP 06 · TUNNEL</span>
+                    <h3 id="androidTunnelCreateTitle" class="android-cos-step-title">Create a tunnel</h3>
+                    <p>A private connection between ChatGPT and your phone.</p>
+                  </header>
+                  <button id="androidTunnelOpenTunnels" class="outline android-tunnel-open-link" type="button" data-external-url="https://platform.openai.com/settings/organization/tunnels" aria-label="Open OpenAI Platform Tunnels">Open Tunnels <span aria-hidden="true">↗</span></button>
+                  <ol class="android-tunnel-steps" aria-label="How to create your tunnel">
+                    <li><strong>Name it</strong><span>Give it a name</span></li>
+                    <li><strong>Workspace</strong><span>Select your workspace</span></li>
+                    <li><strong>Create</strong><span>Confirm in OpenAI</span></li>
+                    <li><strong>Copy ID</strong><span>Paste it below</span></li>
+                  </ol>
+                  <div class="android-tunnel-id-entry">
+                    <label class="android-tunnel-field-label" for="androidOpenAiTunnelId">CORE TUNNEL ID</label>
+                    <input id="androidOpenAiTunnelId" type="text" inputmode="text" maxlength="64" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="tunnel_…" aria-describedby="androidTunnelIdStatus">
+                    <p id="androidTunnelIdStatus" class="android-tunnel-id-status" role="status" aria-live="polite">Not verified. Paste your Core tunnel ID, then tap Save.</p>
+                    <button id="androidTunnelSaveId" type="button" disabled>Save</button>
+                  </div>
+                </section>
+              </div>
+              <!-- Internal compatibility bindings; only OpenAI's secure tunnel is supported in Setup. -->
+              <div id="androidTunnelLegacyCompat" hidden inert aria-hidden="true">
+                <select id="androidOpenAiTunnelMethodSelect" tabindex="-1" aria-hidden="true"><option value="openai">OpenAI Secure MCP Tunnel</option></select>
+                <p id="androidOpenAiTunnelMethodHint">OpenAI Secure MCP Tunnel</p>
+                <input id="androidOpenAiTunnelRuntime" type="text" readonly value="Native Android runtime (bundled)" tabindex="-1">
+                <p id="androidCosTunnelProgramHint">Bundled Android runtime</p>
+                <p id="androidCosTunnelLifecycle">Reconnects after app restart if you previously tapped Connect.</p>
+                <p id="androidCosAlternativeMethodStatus" hidden></p>
+                <div id="androidOpenAiTunnelCredentials">
+                  <button id="androidTunnelOpenApiKeys" type="button">Open API keys</button>
+                  <input id="androidOpenAiTunnelKey" type="password" maxlength="1024" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Legacy tunnel API key">
+                  <p id="androidTunnelStoredKeyState" role="status">Checking stored key…</p>
+                  <button id="androidTunnelSaveKey" type="button">Save key securely</button>
+                  <button id="androidOpenAiTunnelConnect" type="button">Connect tunnel</button>
+                  <button id="androidOpenAiTunnelDisconnect" type="button" disabled>Disconnect</button>
+                </div>
+                <div id="androidLocalMcpControls" class="hidden">
+                  <h4>Local MCP server (Android)</h4>
+                  <p>Read-only localhost server. New secret URL each start; tools: app_info and echo.</p>
+                  <div class="android-openai-tunnel-actions">
+                    <button id="androidLocalMcpStart" type="button">Start local MCP server</button>
+                    <button id="androidLocalMcpStop" class="outline" type="button" disabled>Stop local server</button>
+                  </div>
+                  <label for="androidLocalMcpUrl">Local MCP URL (secret — don't share publicly)</label>
+                  <div class="android-local-mcp-url-row">
+                    <input id="androidLocalMcpUrl" type="text" readonly autocomplete="off" spellcheck="false" value="" placeholder="Start server for URL">
+                    <button id="androidLocalMcpCopyUrl" type="button" class="outline" disabled>Copy URL</button>
+                  </div>
+                  <p id="androidLocalMcpStatus" class="connection-note" role="status">Local MCP server stopped.</p>
+                  <p>Forward to 127.0.0.1:port with your own HTTPS tunnel. Preserve the secret /mcp/ path and the local Host header. This is not proof of ChatGPT pairing.</p>
+                </div>
+                <p id="androidOpenAiTunnelStatus" role="status" aria-live="polite" class="connection-note">Tunnel not configured. No inbound ChatGPT tool call verified.</p>
+                <p id="androidCosTunnelVerificationHint">OpenAI control-plane polling alone is not proof that ChatGPT can call tools. Verification requires a real inbound MCP tool call and a confirmed response. Long-running service while the app is closed is not promised.</p>
+                <div id="androidCosChatgptPanel" class="android-cos-setup-substage" role="group" aria-label="ChatGPT MCP connection status">
+                  <h4>ChatGPT tool-call verification</h4>
+                  <p id="androidCosChatgptStatus" class="connection-note" role="status">No remote tool call verified.</p>
+                  <p>Connecting a tunnel does not prove ChatGPT can use this phone's tools. Only a real inbound MCP tool call and confirmed response count as verification.</p>
+                  <button id="androidCosChatgptTunnel" type="button" class="outline">Show tunnel method</button>
+                </div>
+              </div>
+              <div id="androidCosKeyPanel" class="android-cos-setup-substage hidden" role="group" aria-label="Create an OpenAI Tunnel API key">
+                <section class="android-tunnel-step7" aria-labelledby="androidTunnelKeyNeededTitle">
+                  <header class="android-tunnel-step7-header android-cos-step-header">
+                    <span class="android-tunnel-step7-kicker android-cos-step-eyebrow">STEP 07 · API KEY</span>
+                    <h3 id="androidTunnelKeyNeededTitle" class="android-cos-step-title">Create an API key</h3>
+                    <p>Keep your tunnel key safe on this phone.</p>
+                  </header>
+                  <div class="android-tunnel-step7-guide">
+                    <button id="androidTunnelKeyNeededOpenApiKeys" type="button" class="outline android-tunnel-step7-open"><span aria-hidden="true">↗</span> Open API keys</button>
+                    <p class="android-tunnel-step7-browser-note">Opens OpenAI Platform</p>
+                    <ol class="android-tunnel-step7-steps" aria-label="Create a restricted Tunnel API key">
+                      <li><span>Pick your project</span></li>
+                      <li><span>Choose <strong>Restricted</strong></span></li>
+                      <li><span><strong>Tunnels</strong>: <strong>Read</strong> and <strong>Use</strong></span></li>
+                    </ol>
+                  </div>
+                  <div class="android-tunnel-step7-key">
+                    <label for="androidTunnelKeyNeededInput">TUNNEL API KEY</label>
+                    <input id="androidTunnelKeyNeededInput" type="password" maxlength="512" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="Paste your restricted API key" aria-describedby="androidTunnelKeyNeededStatus androidTunnelStep7Status">
+                    <p id="androidTunnelKeyNeededStatus" role="status" aria-live="polite">Stored with secure Android credential storage. Paste a key to save it.</p>
+                  </div>
+                  <div class="android-tunnel-step7-actions">
+                    <button id="androidTunnelKeyNeededConfirm" type="button" hidden>Save API key</button>
+                  </div>
+                  <button id="androidTunnelRemoveStoredKey" type="button" class="android-tunnel-step7-remove" hidden>Remove stored API key</button>
+                  <p id="androidTunnelStep7Status" class="android-tunnel-step7-status" role="status" aria-live="polite">Checking secure key status…</p>
+                </section>
+                <section id="androidAgentModelAccess" class="android-agent-model-access" aria-label="Model provider for chat and agent tasks">
+                  <header class="android-cos-step-header">
+                    <h4 class="android-agent-model-title">AI model for chat automation</h4>
+                    <p>Write instructions in Chat. Mcp Agent Ai calls Android browser or app tools when needed; there are no separate automation controls.</p>
+                  </header>
+                  <label class="android-automation-app-label" for="androidAgentProvider">Chat transport</label>
+                  <select id="androidAgentProvider" class="android-agent-field">
+                    <option value="chatgpt-browser">ChatGPT account (text chat and simple direct commands)</option>
+                    <option value="openai">OpenAI API (agent tools)</option>
+                    <option value="anthropic">Anthropic API (agent tools)</option>
+                    <option value="openrouter">OpenRouter API (agent tools)</option>
+                  </select>
+                  <div id="androidAgentApiSettings" class="hidden">
+                    <label class="android-automation-app-label" for="androidAgentModel">API model ID</label>
+                    <input id="androidAgentModel" class="android-agent-field" maxlength="120" type="text" autocomplete="off" spellcheck="false" placeholder="Enter supported model ID">
+                    <label class="android-automation-app-label" for="androidAgentApiKey">Model API key (session only)</label>
+                    <input id="androidAgentApiKey" class="android-agent-field" type="password" autocomplete="off" placeholder="Different from your MCP Tunnel key">
+                    <div class="android-automation-actions"><button id="androidAgentSaveKey" type="button">Use model key</button><button id="androidAgentClearKey" type="button" class="outline">Clear model key</button></div>
+                    <p>This inference key is separate from the Tunnel key and is kept in memory. Agent tools run from chat instructions.</p>
+                  </div>
+                  <p id="androidAgentModelStatus" class="android-automation-status" role="status" aria-live="polite">ChatGPT account selected. Advanced model tool calling requires an API provider.</p>
+                </section>
+              </div>
+              <div id="androidCosConnectPanel" class="android-cos-setup-substage android-chatgpt-only-step hidden" role="group" aria-label="Connect secure MCP tunnel">
+                <header class="android-cos-step-header">
+                  <span class="android-chatgpt-connect-kicker android-cos-step-eyebrow">STEP 08 · CONNECT</span>
+                  <h4 class="android-cos-step-title">Connect</h4>
+                  <p>Connect using your saved tunnel and key.</p>
+                </header>
+                <p id="androidCosChatgptConnectStatus" class="android-chatgpt-connect-state" role="status" aria-live="polite">Checking native tunnel status…</p>
+                <div class="android-chatgpt-connect-actions">
+                  <button id="androidCosChatgptConnect" type="button">Connect</button>
+                  <button id="androidCosTunnelDisconnect" type="button" class="outline">Disconnect</button>
+                </div>
+                <p class="android-chatgpt-connect-note">Connection restores automatically until you disconnect.</p>
+                <p id="androidCosConnectStatus" class="connection-note" role="status" hidden>Tunnel not connected.</p>
+              </div>
+              <div id="androidCosMcpPluginPanel" class="android-cos-setup-substage android-cos-mcp-plugin hidden" role="group" aria-label="MCP Plugin tool verification">
+                <header class="android-cos-step-header">
+                  <span class="android-cos-mcp-kicker android-cos-step-eyebrow">STEP 09 · MCP PLUGIN</span>
+                  <h4 class="android-cos-step-title">Add it in ChatGPT</h4>
+                  <p>Link your phone's tools to ChatGPT.</p>
+                </header>
+                <button id="androidCosMcpPluginOpen" class="android-cos-mcp-open" type="button" aria-describedby="androidCosMcpPluginGuide">Open ChatGPT Plugins <span aria-hidden="true">↗</span></button>
+                <details class="android-setup-more android-cos-mcp-help"><summary>How to add the Core Plugin</summary>
+                  <ol id="androidCosMcpPluginGuide" class="android-cos-mcp-guide">
+                    <li><strong>Add → Custom MCP server</strong> in ChatGPT.</li>
+                    <li>Select <strong>Tunnel</strong> from Step 6; choose <strong>No authentication</strong>.</li>
+                    <li>Copy <strong>Name</strong> and <strong>Description</strong> below, then create the plugin.</li>
+                    <li>Ask ChatGPT to call a Core tool; verification is automatic.</li>
+                  </ol>
+                  <p class="android-cos-mcp-hint">Available for accounts or workspaces that support custom MCP servers.</p>
+                </details>
+                <div class="android-cos-mcp-identity">
+                  <label for="androidCosMcpPhoneName">Name for this core</label>
+                  <input id="androidCosMcpPhoneName" type="text" inputmode="text" maxlength="32" autocapitalize="words" autocomplete="off" spellcheck="false" placeholder="Optional, e.g. Haris" aria-describedby="androidCosMcpPhoneHint androidCosMcpPhoneError">
+                  <p id="androidCosMcpPhoneHint" class="android-cos-mcp-hint">Leave blank to use “Mcp Agent Ai Core”.</p>
+                  <p id="androidCosMcpPhoneError" class="android-cos-mcp-error" role="alert" hidden>Leave blank or use up to 32 letters or digits, with spaces, dots, dashes or underscores.</p>
+                </div>
+                <div class="android-cos-mcp-core-card" role="group" aria-label="Core Plugin details to copy into ChatGPT">
+                  <div class="android-cos-mcp-core-heading"><div><span>CORE PLUGIN</span><strong>Required for remote tools</strong></div><span class="android-cos-mcp-required">CORE</span></div>
+                  <label for="androidCosMcpName">NAME</label>
+                  <div class="android-cos-mcp-copy-row">
+                    <input id="androidCosMcpName" type="text" readonly spellcheck="false" aria-label="Core Plugin name">
+                    <button id="androidCosMcpCopyName" type="button" class="outline" aria-label="Copy Core Plugin name">Copy</button>
+                  </div>
+                  <label for="androidCosMcpDescription">DESCRIPTION</label>
+                  <div class="android-cos-mcp-copy-row">
+                    <textarea id="androidCosMcpDescription" readonly rows="4" spellcheck="false" aria-label="Core Plugin description">Connect ChatGPT to the approved MCP tools of Mcp Agent Ai on this Android phone.</textarea>
+                    <button id="androidCosMcpCopyDescription" type="button" class="outline" aria-label="Copy Core Plugin description">Copy</button>
+                  </div>
+                  <p id="androidCosMcpPluginCopyStatus" class="android-cos-mcp-copy-status" role="status" aria-live="polite"></p>
+                </div>
+                <p id="androidCosMcpPluginStatus" class="android-cos-mcp-plugin-status" role="status" aria-live="polite">No inbound MCP tool call verified.</p>
+                <p class="android-cos-mcp-auto-check"><span class="android-cos-mcp-auto-dot" aria-hidden="true"></span> Status updates automatically</p>
+                <details class="android-setup-more android-cos-mcp-evidence-details">
+                  <summary>Connection details</summary>
+                  <p id="androidCosMcpPluginEvidence" class="android-cos-mcp-plugin-evidence">Waiting for a tool call from ChatGPT.</p>
+                </details>
+                <p class="android-cos-mcp-plugin-note">Verified after a real tool call. Your pairing is remembered.</p>
+              </div>
+              <div id="androidCosReadyPanel" class="android-cos-setup-substage hidden" role="group" aria-label="Ten setup step readiness checks">
+                <div class="android-cos-ready-hero">
+                  <span class="android-cos-ready-emblem" aria-hidden="true">✓</span>
+                  <div class="android-cos-step-header"><span class="android-cos-ready-eyebrow android-cos-step-eyebrow">STEP 10 · READY</span><h4 class="android-cos-step-title">You're almost ready</h4>
+                    <p id="androidCosReadyStatus" class="connection-note" role="status">Pending verification.</p>
+                  </div>
+                </div>
+                <div class="android-cos-ready-checks-heading">Your 10 steps</div>
+                <ol id="androidCosReadyChecklist" class="android-cos-ready-checklist"></ol>
+              </div>
+            </div>
+          </section>
+          <section class="setting-group android-storage-setting" id="storageAccessSection" aria-label="Android app permissions" data-setting-category="setup">
+            <div class="setting-group-title android-permissions-heading"><div class="android-cos-step-header"><span class="android-setup-eyebrow android-cos-step-eyebrow">STEP 01 · PERMISSIONS</span><h2 class="android-cos-step-title">Phone permissions</h2><p>Tap Allow. Android checks each permission for you.</p></div></div>
+            <div class="android-permission-group-heading"><span>Required</span><strong id="androidRequiredPermissionCount" role="status" aria-live="polite">Checking…</strong></div>
+            <div class="android-permission-list">
+              <div class="android-permission-row" data-permission-row="files">
+                <div class="android-permission-header"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v10H3zM3 7V5h7l2 2"/></svg><strong>All files access</strong><span id="storageAccessState" class="permission-state" role="status">Checking…</span></div>
+                <p>Access files you choose on this phone.</p>
+                <button id="storageAccessRequest" type="button" class="outline" data-permission-request="files">Allow</button>
+              </div>
+              <div class="android-permission-row" data-permission-row="overlay">
+                <div class="android-permission-header"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h7m-7 4h10"/></svg><strong>Display over other apps</strong><span id="overlayAccessState" class="permission-state" role="status">Checking…</span></div>
+                <p>Show Pocket Bot over other apps.</p>
+                <button type="button" class="outline" data-permission-request="overlay">Allow</button>
+              </div>
+              <div class="android-permission-row" data-permission-row="notifications">
+                <div class="android-permission-header"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 9h18c0-1-3-2-3-9M10 21h4"/></svg><strong>Notifications</strong><span id="notificationAccessState" class="permission-state" role="status">Checking…</span></div>
+                <p>Show session and task notifications.</p>
+                <button type="button" class="outline" data-permission-request="notifications">Allow</button>
+              </div>
+              <div class="android-permission-row" data-permission-row="battery">
+                <div class="android-permission-header"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 10v4M7 10l-2 3h4l-1 2"/></svg><strong>Battery optimization</strong><span id="batteryAccessState" class="permission-state" role="status">Checking…</span></div>
+                <p>Reduce Android background restrictions.</p>
+                <button type="button" class="outline" data-permission-request="battery">Allow</button>
+              </div>
+              <div class="android-permission-row" data-permission-row="accessibility">
+                <div class="android-permission-header"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4" r="2"/><path d="M4 9h16M12 9v12M8 21l4-8 4 8"/></svg><strong>Accessibility service</strong><span id="accessibilityPermissionState" class="permission-state" role="status">Checking…</span></div>
+                <small class="android-permission-description">Enable the service in Android's permission screen.</small>
+                <span id="accessibilityReconnectHint" class="android-accessibility-reconnect-note" role="status" hidden>Android remembers this permission, but the service isn't running. Tap Reconnect and switch Mcp Agent Ai Accessibility off, then on in Android Settings.</span>
+                <button type="button" id="accessibilityManage" class="outline" disabled>Allow</button>
+              </div>
+            </div>
+            <details id="androidOptionalPermissionsSection" class="android-optional-permissions" aria-labelledby="androidOptionalPermissionsTitle">
+              <summary class="android-permission-group-heading android-permission-optional-heading"><span class="android-optional-chevron" aria-hidden="true">›</span><span class="android-optional-summary-copy"><strong id="androidOptionalPermissionsTitle">Optional permissions</strong><small>Camera, microphone &amp; location</small></span><span id="androidOptionalPermissionCount" role="status" aria-live="polite">Checking…</span></summary>
+              <div class="android-permission-list">
+                <div class="android-permission-row android-permission-optional" data-optional-permission="camera">
+                  <div class="android-permission-header"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="14" height="12" rx="2"/><circle cx="10" cy="12" r="3"/><path d="m17 10 4-2v8l-4-2"/></svg><strong>Camera</strong><span id="androidOptionalCameraState" class="permission-state" role="status">Checking…</span></div>
+                  <p>Take photos when you choose.</p>
+                  <button type="button" class="outline" data-optional-permission-request="camera">Allow</button>
+                </div>
+                <div class="android-permission-row android-permission-optional" data-optional-permission="microphone">
+                  <div class="android-permission-header"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4m-4 0h8"/></svg><strong>Microphone</strong><span id="androidOptionalMicrophoneState" class="permission-state" role="status">Checking…</span></div>
+                  <p>Use voice features when supported.</p>
+                  <button type="button" class="outline" data-optional-permission-request="microphone">Allow</button>
+                </div>
+                <div class="android-permission-row android-permission-optional" data-optional-permission="location">
+                  <div class="android-permission-header"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-7 7-12a7 7 0 0 0-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg><strong>Approximate location</strong><span id="androidOptionalLocationState" class="permission-state" role="status">Checking…</span></div>
+                  <p>Share an approximate area when needed.</p>
+                  <button type="button" class="outline" data-optional-permission-request="location">Allow</button>
+                </div>
+              </div>
+              <p id="androidOptionalPermissionFeedback" class="android-optional-permission-feedback" role="status" aria-live="polite">Optional permissions do not affect setup completion.</p>
+            </details>
+          </section>
+          <section class="setting-group connection-group" id="connectionSection" data-setting-category="setup">
+            <div class="setting-group-title"><h2>AI connection</h2><span class="connection-status" id="connectionIndicator">Not configured</span></div>
+            <p>Choose a provider and model here. Only real configured engines can respond.</p>
             <div class="provider-bar">
-              <label for="provider">AI provider / agent</label>
-              <select id="provider">
-                <option value="demo">Demo (no API key)</option>
+              <label for="provider">Provider</label>
+              <select id="provider" aria-label="AI provider">
                 <option value="openai">OpenAI API</option>
                 <option value="anthropic">Anthropic API</option>
                 <option value="openrouter">OpenRouter API</option>
                 <option value="ollama">Ollama (local)</option>
                 <option value="hermes">Hermes Agent (installed CLI)</option>
+                <option value="chatgpt-browser">ChatGPT built-in browser (native app)</option>
               </select>
-              <input id="model" type="text" maxlength="120" placeholder="Model ID (not needed for demo)" autocomplete="off">
-              <button id="keyToggle" class="outline tiny" type="button" aria-controls="keyBox" aria-expanded="false">API key</button>
+              <label for="model">Model ID</label>
+              <input id="model" type="text" maxlength="120" placeholder="Enter your model ID" aria-label="Model ID" autocomplete="off">
+              <button id="keyToggle" class="outline tiny" type="button" aria-controls="keyBox" aria-expanded="false">Configure API key</button>
             </div>
             <div id="keyBox" class="key-box hidden">
-              <input id="apiKey" type="password" placeholder="API key is kept only while this app is running" autocomplete="off">
-              <button id="saveKey" type="button">Use key</button>
-              <button id="clearKey" type="button" class="outline">Clear</button>
+              <label for="apiKey">Session-only API key</label>
+              <input id="apiKey" type="password" placeholder="Never saved to disk" aria-label="API key" autocomplete="off">
+              <div class="key-actions"><button id="saveKey" type="button">Use key</button><button id="clearKey" type="button" class="outline">Clear</button></div>
             </div>
-            <form id="chatForm" class="composer">
-              <textarea id="prompt" rows="3" maxlength="50000" placeholder="Ask COS Fusion anything…  (Try /list with the workspace module enabled)" required></textarea>
-              <div class="compose-foot"><span><span id="charCount">0</span> / 50,000 <span class="key-hint">· Enter to send · Shift+Enter for newline</span></span><button class="primary send" id="send" type="submit">Send <span aria-hidden="true">↗</span></button></div>
-            </form>
-            <div class="footer-hint">Local-first preview · Real AI provider calls may incur charges · Use test data only</div>
-          </div>
-        </div>
-
-        <aside id="settingsPanel" class="settings hidden" aria-label="Workspace customization">
-          <div class="settings-head"><div><strong>Customize workspace</strong><small>Choose exactly what COS can use</small></div><button type="button" class="icon-btn" id="settingsClose" aria-label="Close settings">✕</button></div>
-          <section class="setting-group"><h2>Modules</h2><p>Capabilities are checked again before each tool call.</p><div id="modules"></div></section>
-          <section class="setting-group"><h2>Skills</h2><p>Import Markdown guidance for your assistant. New skills start disabled.</p><div id="skills"></div>
+            <p id="engineStatus" class="connection-note" role="status">Choose a provider to begin.</p>
+          </section>
+          <section class="setting-group native-chatgpt-browser" id="backgroundChatgptSettings" data-setting-category="setup" aria-labelledby="backgroundChatgptTitle">
+            <h2 id="backgroundChatgptTitle">ChatGPT built-in browser</h2>
+            <p>This separate, private website browser is independent of the OpenAI account authorization in Setup. Sign in yourself; website cookies and conversations are not imported from Chrome. Website sign-in and message delivery are checked separately.</p>
+            <ol class="native-chatgpt-steps" aria-label="ChatGPT website setup steps">
+              <li id="backgroundChatgptStepOpen" data-step-state="pending"><strong>1. Open &amp; sign in</strong><span>Open the private ChatGPT window and finish sign-in there.</span></li>
+              <li id="backgroundChatgptStepCheck" data-step-state="pending"><strong>2. Check the website</strong><span>Verify the owned ChatGPT composer, without reading your account or messages.</span></li>
+              <li id="backgroundChatgptStepSelect" data-step-state="pending"><strong>3. Use in Mcp Agent Ai</strong><span>Select ChatGPT website as the main chat provider.</span></li>
+            </ol>
+            <div class="native-chatgpt-actions">
+              <button id="backgroundChatgptOpen" type="button" disabled>Open ChatGPT / Sign in</button>
+              <button id="backgroundChatgptShow" type="button" class="outline hidden" disabled>Show browser</button>
+              <button id="backgroundChatgptHide" type="button" class="outline hidden" disabled>Hide browser</button>
+              <button id="backgroundChatgptProbe" type="button" class="outline hidden" disabled>Check ChatGPT page</button>
+              <button id="backgroundChatgptUse" type="button" class="outline hidden" disabled>Use ChatGPT in chat</button>
+              <button id="backgroundChatgptReconcile" type="button" class="outline hidden" disabled>Check pending ChatGPT turn</button>
+              <button id="backgroundChatgptClose" type="button" class="outline hidden" disabled>Stop browser</button>
+            </div>
+            <p id="backgroundChatgptStatus" class="connection-note" role="status" aria-live="polite">Built-in browser is off. Nothing starts automatically.</p>
+            <p class="native-chatgpt-caution">A ready composer does not prove that you are signed in or that a reply was received. Every message needs approval; no automatic retries. Android may suspend hidden pages, and some sign-in providers reject embedded WebViews.</p>
+          </section>
+          <dialog id="androidCosExtensionManager" class="android-cos-extension-manager" aria-labelledby="androidCosExtensionManagerTitle">
+            <div class="android-cos-extension-page">
+              <header class="android-cos-extension-page-toolbar">
+                <button id="androidCosExtensionDone" type="button" class="android-cos-extension-page-back" aria-label="Back to Setup" title="Back to Setup">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+            <div class="android-cos-extension-manager-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4h1.3a2.7 2.7 0 1 1 0 5.4H3V19a2 2 0 0 0 2 2h4v-1.3a2.7 2.7 0 1 1 5.4 0V21H19a2 2 0 0 0 2-2v-4h-1.3a2.7 2.7 0 1 1 0-5.4H21V5a2 2 0 0 0-2-2h-4v1.3a2.7 2.7 0 1 1-5.4 0V3Z"/></svg>
+            </div>
+                <div class="android-cos-extension-page-title">
+                  <h3 id="androidCosExtensionManagerTitle">Extensions</h3>
+                  <small>App-owned browser</small>
+                </div>
+                <button id="androidCosExtensionRefresh" type="button" class="android-cos-extension-page-refresh" aria-label="Refresh installed extensions" title="Refresh installed extensions">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 10a7 7 0 0 1 11.5-3L20 12M4 12l3 5a7 7 0 0 0 11.5-3"/></svg>
+                </button>
+              </header>
+              <main class="android-cos-extension-page-body">
+                <div class="android-cos-extension-page-heading">
+                  <span>GECKOVIEW EXTENSION MANAGER</span>
+                  <h4>My extensions</h4>
+                  <p>Manage add-ons installed in Mcp Agent Ai. This page uses the GeckoView browser runtime without opening a visible browser tab.</p>
+                </div>
+                <label class="android-cos-extension-search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                  <input id="androidCosExtensionSearch" type="search" placeholder="Search extensions" aria-label="Search installed extensions" autocomplete="off" maxlength="100">
+                </label>
+                <div class="android-cos-extension-page-section-head">
+                  <strong>Installed extensions</strong>
+                  <span id="androidCosExtensionCount">Checking…</span>
+                </div>
+                <p id="androidCosExtensionManagerSummary" role="status" aria-live="polite">Checking installed Android GeckoView extensions…</p>
+                <div id="androidCosExtensionList" class="android-cos-extension-list"></div>
+                <p class="android-cos-extension-note">Only GeckoView WebExtensions are shown. Chrome desktop extensions and Chrome Web Store packages are not compatible with this Android browser. Install Extension in Setup adds the bundled test add-on after your approval.</p>
+              </main>
+            </div>
+          </dialog>
+          <section class="setting-group" id="moduleSection" data-setting-category="agents"><div class="setting-group-title"><h2>Modules</h2><span class="group-count">03</span></div><p>Each capability has its own switch. Changes take effect before the next tool call.</p><div id="modules"></div></section>
+          <section class="setting-group" id="skillsSection" data-setting-category="agents"><div class="setting-group-title"><h2>Skills</h2><span class="group-count">MD</span></div><p>Add instructions for your AI. Imported skills start switched off.</p><div id="skills"></div>
             <form id="skillForm" class="skill-form"><label for="skillName">Skill name</label><input id="skillName" placeholder="review-code" pattern="[a-zA-Z0-9-]{1,50}" maxlength="50" required>
               <label for="skillText">Instructions (Markdown)</label><textarea id="skillText" rows="4" maxlength="32000" placeholder="Review architecture before making changes…" required></textarea><button type="submit" class="outline">+ Import skill</button></form>
           </section>
-          <section class="setting-group"><h2>Workspace</h2><p id="workspace"></p><small>File access is read-only and disabled until enabled above. Restart from a chosen project folder to change this path.</small></section>
-          <section class="setting-group"><h2>Agent engines</h2><p>Hermes uses your installed CLI, existing account and its configured tools. Enable External agents above before sending. Other agents are planned.</p></section>
-          <section class="setting-group"><h2>Coming next</h2><p>Codex / Claude Code engines, workers, terminal, live browser and remote sandbox.</p></section>
+          <section class="setting-group" id="workspaceSection" data-setting-category="workspace"><h2>Workspace path</h2><p class="workspace-path" id="workspace"></p><small>File access is read-only until enabled. Restart with a selected project folder to change this path.</small></section>
+          <section class="setting-group" id="externalSection" data-setting-category="agents"><h2>External engines</h2><p>Hermes uses your installed CLI, credentials and configured tools. Enable External agents above before using it.</p></section>
+          <section id="androidGeneralSettings" class="setting-group android-general-settings" data-setting-category="general" aria-label="General settings">
+            <section class="android-general-section" aria-labelledby="androidGeneralChatsTitle">
+              <header class="android-general-section-head"><h2 id="androidGeneralChatsTitle">Chats</h2><p>How conversations behave.</p></header>
+              <div class="android-general-card">
+                <label class="android-general-setting" for="androidGeneralFollowOutput">
+                  <span><strong>Follow new output</strong><small>Follow while the reply runs. After it finishes, scroll freely to older messages.</small></span>
+                  <input id="androidGeneralFollowOutput" type="checkbox" checked>
+                </label>
+                <label class="android-general-setting" for="androidGeneralMessageDuringTurn">
+                  <span><strong>Messages during a running turn</strong><small id="androidGeneralDuringTurnHint">Send a follow-up while ChatGPT is still working.</small></span>
+                  <select id="androidGeneralMessageDuringTurn">
+                    <option value="steer">Send while working</option>
+                    <option value="queue">Wait until the turn ends</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+            <section class="android-general-section" aria-labelledby="androidGeneralNotificationsTitle">
+              <header class="android-general-section-head"><h2 id="androidGeneralNotificationsTitle">Notifications</h2><p>Android controls notification permission.</p></header>
+              <div class="android-general-card">
+                <label class="android-general-setting" for="androidGeneralNotifyFinish">
+                  <span><strong>Send notification when finished</strong><small>Request a brief pop-up when a reply finishes. Android controls whether banners appear; the alert remains in notifications.</small></span>
+                  <input id="androidGeneralNotifyFinish" type="checkbox">
+                </label>
+                <label class="android-general-setting" for="androidGeneralNotificationDetail">
+                  <span><strong>Notification content</strong><small>Choose what appears in the Android notification.</small></span>
+                  <select id="androidGeneralNotificationDetail">
+                    <option value="task_finished">Task finished</option>
+                    <option value="full_message">Full message</option>
+                  </select>
+                </label>
+                <label class="android-general-setting" for="androidGeneralNotificationPriority">
+                  <span><strong>Notification priority</strong><small>Choose when a finished reply should notify you. Pop-up alerts still follow Android settings.</small></span>
+                  <select id="androidGeneralNotificationPriority">
+                    <option value="foreground">Foreground app</option>
+                    <option value="background">Background app</option>
+                    <option value="both" selected>Both</option>
+                  </select>
+                </label>
+                <div class="android-general-setting">
+                  <span><strong>Phone permissions</strong><small>Manage alerts in Setup. Your selected Android notification settings are respected.</small></span>
+                  <button id="androidGeneralOpenPermissions" type="button">Open Setup</button>
+                </div>
+              </div>
+            </section>
+            <section class="android-general-section" aria-labelledby="androidGeneralPrivacyTitle">
+              <header class="android-general-section-head"><h2 id="androidGeneralPrivacyTitle">Privacy</h2><p>What this phone shares with ChatGPT.</p></header>
+              <div class="android-general-card">
+                <label class="android-general-setting" for="androidPrivacyFullNotification">
+                  <span><strong>Full reply in notifications</strong><small>Off shows “Task finished”, protecting message text on the lock screen.</small></span>
+                  <input id="androidPrivacyFullNotification" type="checkbox">
+                </label>
+                <div class="android-general-setting">
+                  <span><strong>MCP tool permissions</strong><small>The same access policy used by Workspace and Setup.</small></span>
+                  <button id="androidGeneralOpenWorkspace" type="button">Permissions</button>
+                </div>
+                <div class="android-general-setting android-general-information">
+                  <span><strong>Credentials</strong><small>The tunnel API key stays in Android secure storage. General backups never include keys, chats or folder grants.</small></span>
+                  <span class="android-general-readonly">Protected</span>
+                </div>
+              </div>
+            </section>
+            <section class="android-general-section" aria-labelledby="androidGeneralBackupTitle">
+              <header class="android-general-section-head"><h2 id="androidGeneralBackupTitle">Backup</h2><p>Copy or restore just your General preferences.</p></header>
+              <div class="android-general-card">
+                <div class="android-general-setting">
+                  <span><strong>Export preferences</strong><small>Copy a small JSON backup with no accounts or secrets.</small></span>
+                  <button id="androidGeneralExport" type="button">Copy</button>
+                </div>
+                <details id="androidGeneralImport" class="android-general-import">
+                  <summary>Import preferences</summary>
+                  <label for="androidGeneralBackupText">Paste the General preferences JSON you copied earlier.</label>
+                  <textarea id="androidGeneralBackupText" rows="5" maxlength="1024" spellcheck="false" placeholder='{"version":3,"followOutput":true,"notifyOnFinish":false,"notificationDetail":"task_finished","notificationPriority":"both","messageDuringTurn":"queue"}'></textarea>
+                  <div class="android-general-import-actions">
+                    <button id="androidGeneralBackupPreview" type="button">Preview changes</button>
+                    <button id="androidGeneralBackupApply" type="button" disabled>Apply preferences</button>
+                  </div>
+                </details>
+                <p id="androidGeneralBackupStatus" class="android-general-backup-status" role="status" aria-live="polite"></p>
+              </div>
+            </section>
+            <section class="android-general-section" aria-labelledby="androidGeneralDevelopersTitle">
+              <header class="android-general-section-head"><h2 id="androidGeneralDevelopersTitle">For developers</h2><p>Local diagnostics and tool history.</p></header>
+              <div class="android-general-card">
+                <label class="android-general-setting" for="androidDeveloperMode">
+                  <span><strong>Developer mode</strong><small>Show diagnostic actions here. Tool approvals and Android permissions stay enforced.</small></span>
+                  <input id="androidDeveloperMode" type="checkbox">
+                </label>
+                <div id="androidDeveloperControls" class="hidden">
+                <div class="android-general-setting">
+                  <span><strong>Connection diagnostics</strong><small>Check tunnel health, errors and recent MCP events.</small></span>
+                  <button id="androidGeneralOpenHealth" type="button">Open Health</button>
+                </div>
+                <div class="android-general-setting">
+                  <span><strong>Tool approvals</strong><small>Review recorded local tool actions.</small></span>
+                  <button id="androidGeneralOpenReview" type="button">Open Review</button>
+                </div>
+                </div>
+              </div>
+            </section>
+          </section>
+          <section id="androidWorkspaceDashboard" class="setting-group android-workspace-dashboard" data-setting-category="workspace" aria-label="Workspace permissions folders activity and health">
+            <div class="android-workspace-grid">
+              <section class="android-workspace-card android-workspace-permissions" aria-labelledby="androidWorkspacePermissionsTitle">
+                <header class="android-workspace-card-header">
+                  <div><h2 id="androidWorkspacePermissionsTitle">Permissions</h2><p>Choose which tools ChatGPT can use.</p></div>
+                  <button id="androidWorkspaceReadOnly" type="button" class="outline">Read only</button>
+                </header>
+                <div id="androidWorkspacePermissionsSlot" class="android-workspace-surface"></div>
+              </section>
+              <section class="android-workspace-card android-workspace-activity" aria-labelledby="androidWorkspaceActivityTitle">
+                <header class="android-workspace-card-header">
+                  <div><h2 id="androidWorkspaceActivityTitle">Activity</h2><p>Recent local events and failures.</p></div>
+                  <button id="androidWorkspaceCopyActivity" type="button" class="outline"><span aria-hidden="true">⧉</span> Copy</button>
+                </header>
+                <div class="android-workspace-surface android-workspace-activity-feed" id="androidWorkspaceActivityFeed" role="log" aria-label="Recent local events">
+                  <p id="androidWorkspaceActivityStatus" class="android-workspace-feed-empty">Checking activity…</p>
+                </div>
+                <p id="androidWorkspaceActivityCopyStatus" class="android-workspace-copy-status" role="status" aria-live="polite"></p>
+              </section>
+              <section class="android-workspace-card android-workspace-folders" aria-labelledby="androidWorkspaceFoldersTitle">
+                <header class="android-workspace-card-header">
+                  <div><h2 id="androidWorkspaceFoldersTitle">Folders</h2><p>The phone folder shared with local tools.</p></div>
+                  <button id="androidWorkspaceChooseFolder" type="button" class="outline">Choose</button>
+                </header>
+                <div id="androidWorkspaceFoldersSlot" class="android-workspace-surface"></div>
+              </section>
+              <section class="android-workspace-card android-workspace-health" aria-labelledby="androidWorkspaceHealthTitle">
+                <header class="android-workspace-card-header">
+                  <div><h2 id="androidWorkspaceHealthTitle">Health</h2><p>Connection and runtime status.</p></div>
+                  <button id="androidWorkspaceRunChecks" type="button" class="outline"><span aria-hidden="true">⌁</span><span id="androidWorkspaceRunChecksLabel">Run checks</span></button>
+                </header>
+                <div class="android-workspace-surface android-workspace-health-surface">
+                  <div class="android-workspace-health-metrics" aria-label="Tunnel link and ChatGPT call recency">
+                    <div><strong id="androidWorkspaceVerifiedLink">—</strong><span>verified link</span></div>
+                    <div><strong id="androidWorkspaceLastCall">—</strong><span>last ChatGPT call</span></div>
+                  </div>
+                  <div class="android-workspace-health-facts" aria-label="Tunnel runtime diagnostics">
+                    <div class="android-workspace-health-row"><span>Route to OpenAI</span><code id="androidWorkspaceRoute">—</code></div>
+                    <div class="android-workspace-health-row"><span>Poll errors</span><code id="androidWorkspacePollErrors">—</code></div>
+                    <div class="android-workspace-health-row"><span>Tunnel → Android</span><code id="androidWorkspaceTunnelStatus">Checking…</code></div>
+                    <div class="android-workspace-health-row"><span>Tunnel uptime</span><code id="androidWorkspaceUptime">—</code></div>
+                    <div class="android-workspace-health-row"><span>ChatGPT ran a tool</span><code id="androidWorkspaceLastTool">—</code></div>
+                    <div class="android-workspace-health-row"><span>Tunnel client</span><code id="androidWorkspaceTunnelClient">—</code></div>
+                    <div class="android-workspace-health-row"><span>Local server</span><code id="androidWorkspaceLocalServer">—</code></div>
+                    <div class="android-workspace-health-row"><span>Core Plugin</span><code id="androidWorkspacePluginStatus">Checking…</code></div>
+                    <div class="android-workspace-health-row"><span>Core tools</span><code id="androidWorkspaceToolCount">—</code></div>
+                  </div>
+                  <div id="androidWorkspaceChecksResult" class="android-workspace-checks-result" hidden>
+                    <div class="android-workspace-checks-head"><strong id="androidWorkspaceChecksSummary">Checking…</strong><button id="androidWorkspaceCloseChecks" type="button" aria-label="Close check results">×</button></div>
+                    <ul id="androidWorkspaceChecksList"></ul>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+          <!-- Legacy project-storage controls are retained as internal bindings:
+               hiding this UI must never discard project labels or auto-migrate data. -->
+          <div id="androidWorkspaceLegacyBindings" hidden inert aria-hidden="true">
+            <button id="androidSettingsOpenFiles" type="button">Open Files</button>
+          <section class="setting-group android-settings-placeholder" id="projectStorageSettings" aria-labelledby="projectStorageTitle">
+            <h2 id="projectStorageTitle">Project Storage</h2>
+            <p>Choose where this app saves project names and chat groupings. Switching storage does not move or delete your conversations. Existing local labels are preserved; importing them into native storage requires a separate review and approval.</p>
+            <div id="projectBackendControls" class="project-native-controls">
+              <button id="projectNativeEnable" type="button">Use Native Project Storage</button><button id="projectNativeDisable" class="hidden" type="button">Use original local labels</button>
+              <p id="projectNativeStatus" role="status">Existing chat groups remain untouched.</p>
+              <div id="projectImportPreview" class="hidden"><strong>Review project migration</strong><p id="projectImportDetails"></p><div id="projectImportNames"></div><button id="projectImportApprove" type="button">Import reviewed labels</button><button id="projectImportCancel" type="button">Keep original labels</button></div>
+            </div>
+          </section>
+          </div>
+          <section id="androidPluginsSettings" class="setting-group android-plugins-settings" data-setting-category="plugins" aria-labelledby="androidPluginsTitle">
+            <header class="android-plugins-heading"><div><span class="android-plugins-eyebrow">ANDROID · PLUGINS MARKETPLACE</span><h2 id="androidPluginsTitle">Plugins Marketplace</h2><p>Discover bundled capabilities and enable tools separately. One shared Core Tunnel · No second Plugins connector.</p></div><span id="androidPluginsState" class="android-plugins-state" data-state="disconnected">Checking…</span></header>
+            <div class="android-plugins-marketplace-intro" aria-label="Marketplace safety information">
+              <div><strong>Bundled, verified modules</strong><span id="androidPluginsMarketplaceSummary">Checking installed modules…</span></div>
+              <p>Enabling a plugin exposes only its compiled Android tools. No downloaded code, unknown APK, shell script or extra tunnel is installed. Tool actions still require their own native permissions.</p>
+            </div>
+            <div class="android-plugins-card">
+              <div class="android-plugins-section-title"><strong>01 · Shared connection</strong><span>Core Tunnel</span></div>
+              <p>Core tools and enabled Plugins modules use the same OpenAI Tunnel. Configure its only ID and Connect in Setup; no separate Plugins tunnel is needed.</p>
+              <p id="androidPluginsCoreStatus" class="android-plugins-chat-status" data-state="unverified" role="status" aria-live="polite">Checking Core Tunnel…</p>
+            </div>
+            <div class="android-plugins-card">
+              <div class="android-plugins-section-title"><strong>02 · ChatGPT Core connection</strong><span>Existing connector</span></div>
+              <p>Use the existing <strong>Mcp Agent Ai Core</strong> connector in ChatGPT. Enabled Plugins modules appear through that same connection; do not add or install a second Plugins connector.</p>
+              <button id="androidPluginsOpenChatGPT" type="button" class="outline android-plugins-platform">Open ChatGPT connectors <span aria-hidden="true">↗</span></button>
+              <p id="androidPluginsChatStatus" class="android-plugins-chat-status" data-state="unverified" role="status" aria-live="polite">Checking Core connector…</p>
+              <label for="androidPluginsChatName">EXISTING CONNECTOR NAME</label>
+              <div class="android-plugins-copy-row"><input id="androidPluginsChatName" type="text" readonly value="Mcp Agent Ai Core"><button id="androidPluginsCopyName" type="button" class="outline">Copy</button></div>
+              <label for="androidPluginsChatDescription">CORE CONNECTOR DESCRIPTION</label>
+              <div class="android-plugins-copy-row"><textarea id="androidPluginsChatDescription" readonly rows="2">Connect ChatGPT to the approved MCP tools of Mcp Agent Ai on this Android phone. Optional enabled Plugins modules use the same Core Tunnel and connector.</textarea><button id="androidPluginsCopyDescription" type="button" class="outline">Copy</button></div>
+              <p id="androidPluginsCopyFeedback" class="android-plugins-feedback" role="status" aria-live="polite"></p>
+            </div>
+            <div class="android-plugins-card">
+              <div class="android-plugins-section-title"><strong>03 · Browse plugins</strong><span id="androidPluginsToolCount">0 available tools</span></div>
+              <p>Choose a category and search the catalog. Only available, enabled modules publish tools to ChatGPT through the shared Core Tunnel.</p>
+              <div class="android-plugins-marketplace-filters">
+                <label for="androidPluginsSearch">SEARCH PLUGINS</label>
+                <input id="androidPluginsSearch" type="search" maxlength="70" autocomplete="off" spellcheck="false" placeholder="Search plugins and capabilities">
+                <label for="androidPluginsCategory">CATEGORY</label>
+                <select id="androidPluginsCategory" aria-label="Filter plugin category">
+                  <option value="all">All categories</option>
+                  <option value="automation">Automation</option>
+                  <option value="security">Security</option>
+                  <option value="development">Development &amp; Reverse Engineering</option>
+                  <option value="integration">Integrations</option>
+                  <option value="productivity">Productivity</option>
+                </select>
+              </div>
+              <div id="androidPluginsModules" class="android-plugins-modules" aria-live="polite"><p>Checking tools…</p></div>
+              <p id="androidPluginsModulesFeedback" class="android-plugins-feedback" role="status" aria-live="polite"></p>
+              <p class="android-plugins-marketplace-roadmap">GitHub, Cloudflare and third-party downloadable plugins require separate authenticated adapters and package verification. They are not installed by this catalog.</p>
+            </div>
+            <div class="android-plugins-card">
+              <div class="android-plugins-section-title"><strong>04 · External MCP servers</strong><span>HTTPS connections</span></div>
+              <p>Manage a user-approved HTTPS MCP server independently of the bundled Android Plugins. External tools still require explicit approval.</p>
+              <button id="androidPluginsOpenExternalMcp" type="button" class="outline">Manage external MCP connection</button>
+            </div>
+          </section>
+          <section id="androidAutomationGuide" class="setting-group android-automation-guide" data-setting-category="agents" aria-labelledby="androidAutomationTitle">
+            <header class="android-automation-heading">
+              <span class="android-automation-kicker">AGENTS &amp; AUTOMATION</span>
+              <h2 id="androidAutomationTitle">Automation preferences</h2>
+              <p>Browser and Android app modes have moved to Setup → Access → Fine-tune permissions → Automation modes.</p>
+            </header>
+            <button id="androidAutomationOpenFineTune" type="button" class="outline">Open Fine-tune permissions</button>
+            <p>Changing an automation mode only saves a native preference. Tool access and app-session approvals remain separate.</p>
+          </section>
+          <section class="setting-group android-general-settings" data-setting-category="usage" aria-label="Local usage">
+            <h2>Usage</h2><p>Verified device-local counts. Provider token usage, account limits and billing are not available to this Android connection.</p>
+            <div class="android-general-card">
+              <div class="android-general-setting"><span><strong>Saved conversations</strong><small>Chats stored on this device</small></span><strong id="androidUsageChats">—</strong></div>
+              <div class="android-general-setting"><span><strong>Saved assistant replies</strong><small>Replies in local conversation history</small></span><strong id="androidUsageReplies">—</strong></div>
+              <div class="android-general-setting"><span><strong>Prime worker records</strong><small>Available when native Prime state is verified</small></span><strong id="androidUsagePrime">—</strong></div>
+              <div class="android-general-setting"><span><strong>Token and model spend</strong><small>Not reported by the active transport</small></span><strong>Unavailable</strong></div>
+            </div>
+          </section>
+          <section class="setting-group android-general-settings" data-setting-category="appearance" aria-label="Appearance preferences">
+            <h2>Appearance</h2><p>Make the Android workspace comfortable on your phone.</p>
+            <div class="android-general-card">
+              <label class="android-general-setting" for="androidAppearanceTheme"><span><strong>Theme</strong><small>Choose a dark or deeper OLED background.</small></span><select id="androidAppearanceTheme"><option value="dark">Dark</option><option value="oled">OLED black</option></select></label>
+              <label class="android-general-setting" for="androidAppearanceDensity"><span><strong>Interface density</strong><small>Adjust spacing for smaller screens.</small></span><select id="androidAppearanceDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
+              <label class="android-general-setting" for="androidAppearanceReduceMotion"><span><strong>Reduce animation</strong><small>Stop decorative movement, including animated pets.</small></span><input id="androidAppearanceReduceMotion" type="checkbox"></label>
+            </div>
+          </section>
+          <section class="setting-group android-general-settings" data-setting-category="activity" aria-label="Activity summary"><h2>Activity</h2><p>Local task and tool status, without estimated events.</p><div class="android-general-card"><div class="android-general-setting"><span><strong>Prime</strong><small>Most recently verified native Prime session</small></span><strong id="androidActivityPrime">—</strong></div><div class="android-general-setting"><span><strong>Core tools</strong><small>Verified connection state</small></span><strong id="androidActivityCore">—</strong></div></div><button id="androidSettingsOpenReview" type="button" class="outline">Review approved tool actions</button></section>
+          </div>
         </aside>
       </section>
     </main>

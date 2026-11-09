@@ -8,8 +8,8 @@ import { runTurn } from './agent.mjs';
 import { makeProvider, providerNames } from './providers.mjs';
 import { runHermesTurn } from './engines.mjs';
 
-const MIME = { '/': 'text/html; charset=utf-8', '/app.css': 'text/css; charset=utf-8', '/app.js': 'text/javascript; charset=utf-8' };
-const FILES = { '/': 'index.html', '/app.css': 'app.css', '/app.js': 'app.js' };
+const MIME = { '/': 'text/html; charset=utf-8', '/app.css': 'text/css; charset=utf-8', '/app.js': 'text/javascript; charset=utf-8', '/android-boot.js': 'text/javascript; charset=utf-8', '/app-icon.png': 'image/png', '/android-pty-client.js': 'text/javascript; charset=utf-8', '/android-xterm.css': 'text/css; charset=utf-8' };
+const FILES = { '/': 'index.html', '/app.css': 'app.css', '/app.js': 'app.js', '/android-boot.js': 'android-boot.js', '/app-icon.png': 'app-icon.png', '/android-pty-client.js': 'android-pty-client.js', '/android-xterm.css': 'android-xterm.css' };
 const MAX_BODY = 64 * 1024;
 
 function json(res, code, body) {
@@ -56,7 +56,9 @@ export async function startServer({ home = defaultHome(), workspaceRoot = proces
     res.setHeader('x-content-type-options', 'nosniff');
     res.setHeader('referrer-policy', 'no-referrer');
     res.setHeader('x-frame-options', 'DENY');
-    res.setHeader('content-security-policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+    // Bounded in-memory Android SAF image previews need data: only for img-src.
+    // Keep script, connect, frames and every other source policy unchanged.
+    res.setHeader('content-security-policy', "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     if (req.headers.host !== hostname) { json(res, 403, { error: 'Invalid host' }); return; }
     let pathname;
     try { pathname = new URL(req.url, origin).pathname; }
@@ -79,7 +81,7 @@ export async function startServer({ home = defaultHome(), workspaceRoot = proces
       try {
         const state = await loadState(home);
         json(res, 200, { version: '0.2.2-preview', modules: state.modules, skills: state.skills,
-          sessions: state.sessions.map(({ id, at, provider, model, messages, prompt, answer, actions }) => ({
+          sessions: state.sessions.filter(session => providerNames().includes(session.provider)).map(({ id, at, provider, model, messages, prompt, answer, actions }) => ({
             id, at, provider, model, messages: Array.isArray(messages) ? messages : [{ role: 'user', text: prompt }, { role: 'assistant', text: answer }], actions,
           })),
           providers: providerNames(), workspace: startingWorkspace, cloud: 'not available',
@@ -124,7 +126,7 @@ export async function startServer({ home = defaultHome(), workspaceRoot = proces
         if (typeof body.prompt !== 'string' || body.prompt.length > 50_000) throw new Error('Invalid prompt');
         if (body.sessionId != null && (typeof body.sessionId !== 'string' || !/^[0-9a-f-]{36}$/.test(body.sessionId))) throw new Error('Invalid conversation');
         // Public beta is intentionally restricted to the workspace fixed when launched.
-        const provider = providerName === 'hermes' ? null : providerName === 'demo' ? makeProvider('demo') : makeProvider(providerName, {
+        const provider = providerName === 'hermes' ? null : makeProvider(providerName, {
           env: {
             ...process.env,
             ...(secretByProvider.has('openai') ? { OPENAI_API_KEY: secretByProvider.get('openai') } : {}),

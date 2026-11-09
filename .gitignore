@@ -11,3 +11,11 @@ work/
 *.pfx
 *.pem
 *.key
+android/.gradle/
+android/.idea/
+android/build/
+android/app/build/
+android/local.properties
+native-core/target/
+src-tauri/target/
+src-tauri/gen/

@@ -1,0 +1,13 @@
+{
+  "manifest_version": 2,
+  "name": "Mcp Agent Ai GeckoView Test",
+  "version": "0.1.0",
+  "description": "Original bundled extension used only for explicit GeckoView installation QA.",
+  "browser_specific_settings": {
+    "gecko": { "id": "mcp-agent-browser-probe@example.com" }
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "permissions": []
+}

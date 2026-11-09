@@ -1,61 +1,64 @@
-# COS Fusion — Windows Preview v0.2.2
+# Mcp Agent Ai
 
-Projek baharu yang berasingan daripada Chat On Steroids 2.1.42 / 2.1.46. Sekarang ada **agent runtime dan GUI web localhost yang boleh dijalankan**. GUI dibuka dalam browser biasa; ini belum aplikasi native Electron, produk penuh atau cloud. Tidak mengubah COS sedia ada.
+**An Android AI agent workspace with ChatGPT sign-in, local tools, projects, private browsing, skills and MCP integration.**
 
-## Windows portable preview
+> Preview 0.2.2 · Android 8.0+ (API 26) · ARM64 (arm64-v8a). This is an Android app, not a Windows desktop program.
 
-`npm run dist:win` menghasilkan `release/COS-Fusion-0.2.2-preview-Windows-x64.zip`, yang mengandungi EXE standalone, arahan penggunaan dan SHA256. **Tester Windows x64 tidak perlu memasang Node.js**. Preview masih unsigned dan untuk ujian terhad, bukan release awam yang diperakui.
+## Screenshots
 
-Double-click `COS-Fusion-Preview.exe` selepas extract. Browser membuka UI COS Fusion; tutup console yang kekal terbuka untuk tamatkan proses. Dalam **Customize**, hidupkan modul Workspace, kemudian cuba `/list` dengan provider Demo. Modul Workspace sengaja OFF pada permulaan bagi melindungi fail. UI Fusion Workspace menggunakan navigasi yang boleh dibuka pada paparan kecil, shortcut `Ctrl+K` untuk chat baharu, loading state dan status modul.
+![Android chat and composer](docs/screenshots/android-chat.png)
 
-## Jalankan daripada source
+![Android settings and permissions](docs/screenshots/android-settings.png)
 
-Keperluan: Node.js 22 ke atas. Tiada `npm install` diperlukan.
+![Skills library](docs/screenshots/android-skills.png)
+
+*Screenshots are reproducible UI previews from the Android layout test harness; OS permission prompts and actual device content may differ.*
+
+## Install
+
+1. Get **Mcp-Agent-Ai-Android.apk** from a published GitHub release, when available, or build it yourself using the steps below.
+2. On a compatible ARM64 Android phone, open the APK and allow installation from your chosen file manager when Android asks.
+3. Open **Mcp Agent Ai → Settings → Setup**. Grant only the permissions needed for the tools you want to use. Accessibility and screen access are controlled by Android.
+4. Sign in using the app's ChatGPT authorization flow, or configure a supported API provider and model. A saved credential is not proof that a reply or tool call has succeeded.
+5. Choose a project and optionally share a folder using Android's system folder picker. Enable individual plugin capabilities only when needed.
+
+**Updating an existing installation:** install the same-signed APK over the existing app. Do not uninstall or clear app data if you need to retain chats, settings, and folder grants. Preview builds may be debug-signed and may not upgrade a differently signed release.
+
+## What you can do
+
+- **Chat:** save conversations, search chat history, use normal messages and manually reviewed Goal or Plan workflows. Prime can coordinate up to two explicit provider-backed workers with verified lifecycle and history.
+- **Browser:** use an app-owned private Android browser with HTTPS navigation, tabs, back/forward and a native right-side drawer. It uses its own WebView data profile rather than your personal Chrome cookies.
+- **Android tools:** explicitly approve supported app, browser, file, terminal, and automation actions. Actual availability depends on Android permissions and the current app session.
+- **Files and projects:** organize conversations, work with app-private files, and grant a specific phone folder using Android's Storage Access Framework.
+- **Plugins and MCP:** inspect bundled native plugin capabilities, enable or disable them separately, and connect to supported MCP endpoints and the OpenAI Secure MCP Tunnel when configured.
+- **Skills and pets:** create or import reviewed Markdown instruction skills; enable them individually. Choose from animated in-app pets and reposition one on the chat screen.
+- **Settings:** change follow-output behavior, choose whether follow-ups are sent automatically after a verified turn or saved as a draft, configure finished-turn notifications, and adjust appearance.
+
+## Optional downloads and current limits
+
+- **Node.js and npm:** not bundled inside the APK. Use **Termux** with its own Node.js package if you need a user-operated Node/npm terminal. The Android app does not silently execute commands inside Termux.
+- **SSH server projects:** the project picker currently supports local project groups and phone folders; authenticated remote SSH project transport is not yet available inside the app.
+- **GeckoView extensions:** the bundled Android browser supports its own compatible extension manager; desktop Chrome/CRX extensions are not Android WebView extensions.
+- **AI models:** API access may require a separate account, key, and network connection. Model usage, token billing, continuous autonomous Loop execution, all-language toolchains, third-party plugin auto-updates and full COS desktop parity are not promised in this preview.
+
+## Build from source (Windows development host)
+
+Install **Node.js 22+**, **Rust** with the `aarch64-linux-android` target, **JDK 21**, **Android SDK**, **Android NDK**, and a compatible Gradle environment. Set `JAVA_HOME`, `ANDROID_HOME`, and `NDK_HOME` to your installed SDK paths.
 
 ```powershell
-node .\bin\cos.mjs status
-node .\bin\preview.mjs
-node .\bin\cos.mjs demo /list
-node .\bin\cos.mjs modules
-node .\bin\cos.mjs module enable notes
-node .\bin\cos.mjs skill add .\examples\review-skill.md
-node .\bin\cos.mjs skill enable review-skill
+npm ci
+npm run typecheck
 npm test
 npm run qa:ui
+cargo test --offline --manifest-path native-core/Cargo.toml --lib
+cargo test --offline --manifest-path src-tauri/Cargo.toml --lib
+npm run native:android
 ```
 
-Semua keadaan demo berada di `~/.cos-fusion` secara lalai. Tetapkan `COS_FUSION_HOME` untuk menggunakan folder ujian sendiri. Tiada proses yang terus berjalan selepas arahan tamat.
+The output is `release/Mcp-Agent-Ai-Android.apk`. A Windows host is used for development and QA only; the product target is Android. A manual GitHub Actions workflow is available at `.github/workflows/android-preview.yml`.
 
-## Cuba model sebenar
+## Security and state
 
-```powershell
-$env:OPENAI_API_KEY = '<your-key>'
-node .\bin\cos.mjs ask openai <model-id> 'List project files'
+Native permissions, model tool proposals, browser DOM access and OS grants require explicit user approval where applicable. The UI only shows a connection as verified when the corresponding native/backend receipt supports it. Browser cookies remain in the app-owned profile; tools must not import personal Chrome credentials. Running jobs interrupted by a process restart must not be silently resumed or marked successful.
 
-$env:ANTHROPIC_API_KEY = '<your-key>'
-node .\bin\cos.mjs ask anthropic <model-id> 'Explain this project'
-
-$env:OPENROUTER_API_KEY = '<your-key>'
-node .\bin\cos.mjs ask openrouter <model-id> 'Review README'
-```
-
-Ollama juga boleh dipilih (`ask ollama <model-id> ...`) jika Ollama berjalan dalam mesin sendiri. `COS_FUSION_ENDPOINT` boleh menukar URL API untuk adapter semasa; API mesti melalui HTTPS kecuali loopback tempatan. Keys hanya dibaca dari environment, tidak disimpan oleh COS Fusion. Model dan akaun perlu tersedia di provider masing-masing. Pengujian dengan model sebenar memerlukan credentials pengguna dan tidak dibuat secara automatik.
-
-## Apa yang benar-benar berfungsi
-
-- Agent loop bebas model dengan sokongan panggilan tool dan hasil yang disemak.
-- Adapter OpenAI-compatible (OpenAI, OpenRouter, Ollama) dan Anthropic Messages.
-- Hermes Agent CLI optional: pilih Hermes dalam UI, hidupkan toggle External agents di Customize, kemudian hantar prompt. Hermes menggunakan pemasangan, konfigurasi model dan tools sendiri. Pilihan model boleh dikosongkan. Sesi Hermes disambung apabila thread yang sama digunakan. COS tidak memasang Hermes secara automatik.
-- Modul `workspace` dan `notes` dengan enable/disable dan semakan kebenaran semasa tool digunakan.
-- Tambah, hidupkan, matikan dan buang fail Skill Markdown yang disalin ke direktori aplikasi.
-- Demo provider tanpa kunci, rekod sehingga 25 hasil sesi setempat, ujian automatik.
-- GUI web localhost dengan thread sambung sembang, pemilih provider, API key dalam memori sementara, modules & skills management.
-- ZIP portable dengan EXE Windows x64 menggunakan Node single executable applications (SEA).
-
-## Belum diimplementasi
-
-GUI native/Electron, Codex app-server dan Claude Code CLI integration, Hermes agent gateway penuh, subagents, browser live preview, desktop input, cloud agent runner, job queues, automatic updates, encrypted local storage, sandbox sebenar untuk third-party executable plugins dan backup/migrasi data COS lama.
-
-**Maklumat privasi:** prototaip menyimpan prompt/jawapan dan sehingga 25 thread dalam `state.json` tempatan sebagai teks biasa. Gunakan workspace dan prompt ujian; ia belum sesuai untuk data sulit. Credentials yang ditaip dalam GUI tidak disimpan pada disk. Model sebenar memerlukan API provider berasingan dan mungkin berbayar. Hermes menggunakan akaun, konfigurasi, tool permissions dan penyimpanan sesi milik Hermes sendiri; ia mungkin menjalankan arahan atau mengubah fail jika konfigurasi Hermes membenarkannya. Hidupkan External agents hanya apabila mahu menggunakan agent tersebut.
-
-Lihat [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PRODUCT-ROADMAP.md](docs/PRODUCT-ROADMAP.md), dan [docs/BETA-README.txt](docs/BETA-README.txt) untuk binaan penuh serta had beta.
+See [Android migration notes](docs/NATIVE-MIGRATION.md), [browser design](docs/BROWSER-ENGINE-DESIGN.md), and the [COS parity matrix](docs/COS-ANDROID-PARITY-MATRIX.md) for implementation details, tests, and remaining gaps.

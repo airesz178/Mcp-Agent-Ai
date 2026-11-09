@@ -24,7 +24,7 @@ export async function loadState(home = defaultHome()) {
   const parsed = JSON.parse(data);
   if (!parsed || parsed.version !== 1 || !parsed.modules || !Array.isArray(parsed.skills) ||
       !parsed.notes || !Array.isArray(parsed.sessions)) {
-    throw new Error('Invalid COS Fusion state. Existing data has not been overwritten.');
+    throw new Error('Invalid Mcp Agent Ai state. Existing data has not been overwritten.');
   }
   return { ...parsed, modules: { ...freshState().modules, ...parsed.modules } };
 }

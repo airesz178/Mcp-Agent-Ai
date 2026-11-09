@@ -9,13 +9,12 @@ const home = defaultHome();
 const [command, ...args] = process.argv.slice(2);
 
 function usage() {
-  console.log(`COS Fusion Core 0.1.0 (prototype)\n
+  console.log(`Mcp Agent Ai Core 0.1.0 (prototype)\n
   node bin/cos.mjs status
   node bin/cos.mjs modules
   node bin/cos.mjs module enable|disable workspace|notes
   node bin/cos.mjs skill add path/to/SKILL.md
   node bin/cos.mjs skill enable|disable|remove skill-id
-  node bin/cos.mjs demo /list
   node bin/cos.mjs ask openai|anthropic|openrouter|ollama|hermes MODEL "your task"
 
 State: COS_FUSION_HOME (default ~/.cos-fusion)
@@ -44,13 +43,6 @@ try {
   } else if (command === 'skill' && args[0] === 'remove' && args[1]) {
     await removeSkill(home, args[1]);
     console.log(`Removed skill ${args[1]}`);
-  } else if (command === 'demo') {
-    // The explicit /list demo enables a read-only workspace module for the demonstration.
-    await setModule(home, 'workspace', true);
-    const output = await runTurn({ prompt: args.join(' ') || '/list', home,
-      workspaceRoot: process.env.COS_FUSION_WORKSPACE || process.cwd() });
-    console.log(output.answer);
-    console.log(JSON.stringify({ sessionId: output.sessionId, actions: output.actions }));
   } else if (command === 'ask' && args.length >= 3) {
     const [providerName, model, ...prompt] = args;
     const options = { prompt: prompt.join(' '), model: model === '-' ? '' : model, home,
@@ -60,6 +52,6 @@ try {
     console.log(JSON.stringify({ sessionId: output.sessionId, actions: output.actions }));
   } else { usage(); if (command && command !== 'help') process.exitCode = 2; }
 } catch (error) {
-  console.error(`COS Fusion: ${error.message}`);
+  console.error(`Mcp Agent Ai: ${error.message}`);
   process.exitCode = 1;
 }

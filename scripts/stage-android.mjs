@@ -1,0 +1,22 @@
+import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { pruneOldReleases } from './release-cleanup.mjs';
+
+if (process.platform !== 'win32') throw new Error('Android distribution is built on Windows only');
+const root = fileURLToPath(new URL('..', import.meta.url));
+const version = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
+const source = path.join(root, 'android', 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+const size = (await stat(source)).size;
+if (size < 1024) throw new Error('No valid Android debug APK to stage');
+const releaseDir = path.join(root, 'release');
+await mkdir(releaseDir, { recursive: true });
+const name = `Mcp-Agent-Ai-${version}-Android-debug.apk`;
+const target = path.join(releaseDir, name);
+await copyFile(source, target);
+const checksum = createHash('sha256').update(await readFile(target)).digest('hex').toUpperCase();
+await writeFile(`${target}.sha256`, `${checksum} *${name}\n`);
+const removed = await pruneOldReleases({ releaseDir, platform: 'android', version });
+console.log(`Android release ready: ${name} (${size} bytes); SHA256 ${checksum}`);
+console.log(`Removed ${removed.length} superseded Android artifacts${removed.length ? ': ' + removed.join(', ') : ''}`);

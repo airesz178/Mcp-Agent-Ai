@@ -1,47 +1,41 @@
-COS FUSION PREVIEW 0.2.2 - WINDOWS x64
-===================================
+MCP AGENT AI PREVIEW 0.2.2 - ANDROID ARM64
+==========================================
 
-This is an EARLY LOCAL PREVIEW, not a finished Codex / Claude Code / Hermes alternative.
-Only share it with testers who understand the current limitations.
+Current product target: Android 8.0+ (API 26), ARM64 only.
+Windows is used to develop/build/test the Android app; no Windows installer.
 
-HOW TO TRY
-1. Extract this ZIP and double-click COS-Fusion-Preview.exe.
-2. A command window will stay open while COS Fusion is running.
-3. The preview opens in the default web browser on 127.0.0.1 (localhost).
-4. Choose Demo (no API key). Click Customize, enable Workspace, and type /list.
-5. For an actual model, select a provider, enter its exact model ID, and provide
-   a valid API key through the API key button (or use your environment variables).
-6. Close the command window to stop COS Fusion.
-7. To use Hermes Agent, install and configure Hermes separately, choose Hermes
-   in the provider selector and enable External agents in Customize first.
-   Hermes uses its OWN model, credentials and tool permissions; it can invoke
-   tools or edit files according to that configuration. Model ID is optional.
+Preview APK: release/Mcp-Agent-Ai-Android.apk
+Package: ai.mcpagent.app; versionName 0.2.2; versionCode 2002.
+This is an EARLY DEBUG-SIGNED PREVIEW, not a finished COS replacement.
 
-YOUR DATA
-- No centralized COS service or telemetry is used by this preview.
-- Prompts, responses, and recent conversation history are saved UNENCRYPTED at
-  %USERPROFILE%\.cos-fusion\state.json. Use only test data.
-- Workspace file access is initially OFF and limited to the local sample folder:
-  %USERPROFILE%\.cos-fusion\workspace.
-- API keys entered in the UI are held in the local process's memory and disappear
-  when the process closes. They are not written to the COS state file.
-- When using a real provider, text and any tool output submitted to the model are
-  sent to that provider under its terms, and may incur usage charges.
-- There is no continuous cloud runner; closing the app stops local work.
+SAFE INSTALLATION / UPDATE
+- Verify package identity, signing certificate, APK v2 signature and SHA256.
+- Only install on a personally owned/authorized phone that is idle and cool.
+- For an existing installation, use adb install -r -t to preserve app data.
+- NEVER uninstall, clear app data or grant Android permissions silently.
+- Obtain any requested Android permissions through the OS consent screen.
 
-WINDOWS WARNING
-This prototype EXE is NOT code-signed and may show an Unknown publisher / SmartScreen
-warning. We have not established trusted public distribution or reputation. Do not
-bypass a security warning for a file that is not from a verified project source.
-Verify the SHA256 checksum against the release's SHA256SUMS.txt before testing.
+NATIVE ANDROID BROWSER
+- Main UI and private browser use Android WebView.
+- Optional Custom Browser uses GeckoView with user-reviewed WebExtensions.
+- Chrome unpacked extensions/CRX and privileged COS Chrome extensions do
+  NOT automatically run on Android; do not claim Chrome parity.
+- GeckoView does not promise unrestricted background/headless operation.
 
-LIMITATIONS
-Preview does not include Codex app-server, Claude Code runtime, full Hermes gateway,
-desktop control, live browser, subagents, cloud execution or automatic updates.
-The first chat is local demo unless you configure a real model; sessions are limited
-to 25 recent threads and model responses do not stream yet.
+USER DATA / PROVIDERS
+- Prompt, answer and session content may be stored inside app-private storage.
+- API keys are intended to stay in process memory; review actual provider flows
+  before using sensitive conversations or files.
+- Paid API providers may charge for model use.
+- Setup and connection panels must never infer verification from a toggle,
+  a loaded page, a local listener or a configured key alone.
 
-PUBLIC RELEASE READINESS
-Before distributing broadly: agree on project license and branding; publish source
-and reproducible releases; security review + trusted signing; test on clean Windows
-devices and across supported models; write a privacy policy and issue-reporting path.
+LIMITATIONS / TEST STATUS
+- Full COS v2.1.49 feature parity has NOT been verified.
+- A previous GeckoView build rendered HTTPS on an Android 11 realme device.
+- The latest toolbar and extension install/management implementation requires
+  acceptance testing after a safe in-place APK update.
+- Production release requires Android security review, up-to-date GeckoView,
+  trusted signing, lifecycle/data migration, permission and provider tests.
+
+No Windows, macOS, Linux or iOS package is distributed.

@@ -1,0 +1,33 @@
+plugins { id 'com.android.application' }
+
+def uiAssets = layout.buildDirectory.dir('generated/shared-ui')
+def syncSharedUi = tasks.register('syncSharedUi', Copy) {
+    from(rootProject.file('../ui')) {
+        include 'index.html', 'app.css', 'app.js'
+    }
+    into(uiAssets)
+}
+
+android {
+    namespace 'ai.mcpagent.preview'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'ai.mcpagent.preview'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.2.2-preview'
+    }
+    buildTypes {
+        debug { debuggable true }
+        release { minifyEnabled false }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main.assets.srcDir uiAssets
+}
+
+tasks.named('preBuild').configure { dependsOn(syncSharedUi) }

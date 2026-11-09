@@ -1,4 +1,8 @@
-# COS Fusion — reka bentuk generasi baharu
+# Mcp Agent Ai — reka bentuk generasi baharu
+
+**Keputusan terkini (2026-11-04): sasaran aplikasi hanya Android.** Windows
+digunakan untuk build/ADB/Playwright sahaja; rujukan desktop/CLI/web di bawah
+ialah idea atau harness lama, **bukan platform release**.
 
 ## Keputusan produk
 
@@ -17,19 +21,21 @@ Gabungan ciri daripada produk lain bermaksud **menggunakan interface dan idea ya
 
 ```mermaid
 flowchart TD
-    UI[Desktop / CLI / Mobile / Web] --> Core[COS Agent Core]
+    UI[Android Tauri / Kotlin UI] --> Core[Mcp Agent Ai Native Core]
     Core --> Store[Sessions / memory / permissions]
     Core --> Providers[Provider adapters]
     Providers --> OA[OpenAI / OpenRouter / Ollama]
     Providers --> AN[Anthropic]
     Providers --> EXT[Codex / Claude Code / Hermes integrations - future]
     Core --> Tools[Tool + Skill registry]
-    Tools --> MCP[MCP plugins - future]
+    Tools --> MCP[MCP plugin registry - browser/app-control native]
     Tools --> FS[Workspace tools]
     Core --> Runner[Execution target]
     Runner --> Local[Local app - current]
     Runner --> Remote[Managed sandbox / cloud job - future]
 ```
+
+**Android tunnel:** Core MCP dan plugin registry kini berkongsi satu OpenAI Secure MCP Tunnel ID, kunci, sesi poll serta senarai tools/list. Core menawarkan app_info, echo dan pembacaan fail yang dibenarkan; modul Plugins seperti browser dan Android App Control hanya muncul apabila diaktifkan dan dibuktikan tersedia. Tiada Plugins Tunnel berasingan atau butang Connect kedua. Android masih menyemak skrin unlocked, fokus aplikasi, sesi hidup dan had akses sebelum tindakan kawalan.
 
 Tidak perlu laptop sebagai VPS: GUI boleh buka/tutup secara normal. Jika tugasan mesti terus berjalan apabila laptop dimatikan, COS menyerahkan job kepada remote runner atau API managed execution dan menyimpan status/job receipt di cloud. Ini perlukan akaun, sambungan, perkhidmatan pengiraan dan biasanya kos. File/desktop tempatan tidak boleh dicapai sewaktu laptop offline tanpa agen peranti sendiri yang aktif.
 

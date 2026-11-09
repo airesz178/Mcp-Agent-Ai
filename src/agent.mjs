@@ -5,7 +5,7 @@ import { makeProvider } from './providers.mjs';
 
 /** Local execution is real. Cloud execution is a future adapter, never silently simulated. */
 export async function runTurn({
-  prompt, providerName = 'demo', model = '', home = defaultHome(), workspaceRoot = process.cwd(),
+  prompt, providerName = 'openai', model = '', home = defaultHome(), workspaceRoot = process.cwd(),
   execution = 'local', provider = null, maxSteps = 8, sessionId = null,
 }) {
   if (execution !== 'local') throw new Error('Cloud runner is not configured; no remote work was started');
@@ -14,12 +14,15 @@ export async function runTurn({
   if (!Number.isInteger(maxSteps) || maxSteps < 1 || maxSteps > 20) throw new Error('Invalid step limit');
   const state = await loadState(home);
   const activeProvider = provider ?? makeProvider(providerName);
-  if (activeProvider.id !== 'demo' && !model) throw new Error('Model name is required');
+  if (!model) throw new Error('Model name is required');
   const skills = await enabledSkillText(home, state);
   const previous = sessionId ? state.sessions.find(session => session.id === sessionId) : null;
   if (sessionId && !previous) throw new Error('Conversation not found');
+  if (previous && (previous.provider !== activeProvider.id || previous.model !== model)) {
+    throw new Error('Start a new chat to change provider or model');
+  }
   const messages = [
-    { role: 'system', text: `You are COS Fusion, a coding assistant. Use available tools only when needed. Workspace: ${workspaceRoot}. Never claim an action succeeded unless tool output proves it.${skills ? `\n\nEnabled skills:\n${skills}` : ''}` },
+    { role: 'system', text: `You are Mcp Agent Ai, a coding assistant. Use available tools only when needed. Workspace: ${workspaceRoot}. Never claim an action succeeded unless tool output proves it.${skills ? `\n\nEnabled skills:\n${skills}` : ''}` },
     ...(Array.isArray(previous?.messages) ? previous.messages.slice(-12) : []),
     { role: 'user', text: prompt },
   ];

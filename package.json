@@ -1,24 +1,39 @@
 {
-  "name": "cos-fusion-core",
+  "name": "mcp-agent-ai",
   "version": "0.2.2-preview",
   "private": true,
   "type": "module",
-  "description": "Experimental provider-neutral agent core for a future Chat On Steroids",
+  "description": "Mcp Agent Ai: a standalone Android AI agent workspace",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "build:ui": "node scripts/build-ui.mjs",
+    "preqa:ui": "npm run build:ui",
+    "tauri": "tauri",
+    "native:check": "cargo check --manifest-path src-tauri/Cargo.toml",
+    "native:test": "cargo test --manifest-path native-core/Cargo.toml",
+    "native:android": "tauri android build --debug --apk --ci --target aarch64",
+    "prenative:android": "node scripts/patch-tauri-android.mjs",
+    "postnative:android": "node scripts/stage-native.mjs android",
+    "dist:android": "npm run native:android",
     "start": "node bin/preview.mjs",
     "preview": "node bin/preview.mjs",
-    "qa:ui": "node scripts/qa-ui.mjs",
-    "dist:win": "node scripts/build-preview.mjs",
-    "smoke:win": "node scripts/smoke-release.mjs",
-    "demo": "node bin/cos.mjs demo /list"
+    "qa:ui": "node scripts/qa-ui.mjs"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
     "esbuild": "^0.28.2",
     "playwright": "^1.64.1",
+    "resedit": "^3.1.0",
+    "typescript": "^5.9.3",
     "yazl": "^3.3.1"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0"
   }
 }
