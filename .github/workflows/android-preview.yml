@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/android-preview.yml'
+      # Restrict automatic builds to explicit release-workflow changes.
 
 permissions:
   contents: write
@@ -16,6 +17,7 @@ concurrency:
 
 jobs:
   apk:
+    # A dedicated release commit starts the full ARM64 build.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.head_commit.message == 'ci: publish Android preview release'
