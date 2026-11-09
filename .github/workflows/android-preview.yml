@@ -39,24 +39,48 @@ jobs:
             Sort-Object Name -Descending | Select-Object -First 1
           if (-not $ndk) { throw 'Android NDK not installed on build runner' }
           "NDK_HOME=$($ndk.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - name: Prepare Gradle with a longer network timeout
+      - name: Prepare checksum-pinned Gradle via alternate mirrors
         shell: pwsh
         run: |
           npx tauri android init --ci --skip-targets-install
           if ($LASTEXITCODE -ne 0) { throw 'Tauri Android project initialization failed' }
           $wrapperProperties = Join-Path $PWD 'src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties'
           if (-not (Test-Path -LiteralPath $wrapperProperties)) { throw 'Gradle wrapper properties missing' }
-          $properties = @(Get-Content -LiteralPath $wrapperProperties | Where-Object { $_ -notmatch '^networkTimeout=' })
+          $properties = @(Get-Content -LiteralPath $wrapperProperties | Where-Object {
+            $_ -notmatch '^(networkTimeout|distributionUrl|distributionSha256Sum)='
+          })
+          # SHA-256 for the official Gradle 9.6.1 binary distribution.
+          # Fail closed if any alternate mirror serves different bytes.
+          $properties += 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14'
           $properties += 'networkTimeout=120000'
-          $properties | Set-Content -LiteralPath $wrapperProperties -Encoding utf8
           $wrapper = Join-Path $PWD 'src-tauri/gen/android/gradlew.bat'
           $ready = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
+          $mirrors = @(
+            'https://mirrors.huaweicloud.com/gradle/gradle-9.6.1-bin.zip',
+            'https://mirrors.aliyun.com/gradle/distributions/v9.6.1/gradle-9.6.1-bin.zip',
+            'https://mirrors.nju.edu.cn/gradle/gradle-9.6.1-bin.zip',
+            'https://downloads.gradle.org/distributions/gradle-9.6.1-bin.zip'
+          )
+          foreach ($mirror in $mirrors) {
+            $url = $mirror.Replace(':', '\:')
+            @($properties) + "distributionUrl=$url" |
+              Set-Content -LiteralPath $wrapperProperties -Encoding utf8
+            Write-Host "Checking pinned Gradle 9.6.1 from $mirror"
             & $wrapper --version
             if ($LASTEXITCODE -eq 0) { $ready = $true; break }
-            if ($attempt -lt 3) { Start-Sleep -Seconds 5 }
+            Start-Sleep -Seconds 3
           }
-          if (-not $ready) { throw 'Gradle distribution failed after three timed attempts' }
+          if (-not $ready) { throw 'No checksum-valid Gradle mirror was reachable' }
+          # The generated buildSrc project resolves Kotlin compiler artifacts
+          # separately; include a public Maven mirror before Maven Central.
+          $buildSrc = Join-Path $PWD 'src-tauri/gen/android/buildSrc/build.gradle.kts'
+          if (-not (Test-Path -LiteralPath $buildSrc)) { throw 'Gradle buildSrc missing' }
+          $script = Get-Content -LiteralPath $buildSrc -Raw
+          if ($script -notmatch 'maven.aliyun.com') {
+            $script = $script.Replace('    mavenCentral()',
+              '    maven { url = uri("https://maven.aliyun.com/repository/public") }' + "`n" + '    mavenCentral()')
+            $script | Set-Content -LiteralPath $buildSrc -Encoding utf8
+          }
       - name: Build one native Android APK
         shell: pwsh
         run: |
