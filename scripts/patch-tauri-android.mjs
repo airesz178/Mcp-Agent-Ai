@@ -50,7 +50,9 @@ if (!/class MainActivity\s*:\s*TauriActivity\(\)/.test(activity) ||
 const hasImport = /import androidx\.activity\.enableEdgeToEdge\s*\r?\n/.test(activity);
 const hasCall = /^\s*enableEdgeToEdge\(\)\s*$/m.test(activity);
 if (hasImport !== hasCall) throw new Error('MainActivity edge-to-edge source inconsistent');
-let fixedActivity = activity
+// Windows-generated Kotlin may use CRLF. Normalize the generated Activity
+// once so guarded imports and idempotent Back-handler matching are stable.
+let fixedActivity = activity.replace(/\r\n/g, '\n')
   .replace(/^import androidx\.activity\.enableEdgeToEdge\s*\r?\n/m, '')
   .replace(/^\s*enableEdgeToEdge\(\)\s*\r?\n/m, '\n');
 // The bundled Android app is intentionally portrait-only. Setting the launch
@@ -86,6 +88,163 @@ if ((fixedActivity.match(/override fun onResume\(\)/g) || []).length !== 1 ||
     !fixedActivity.includes('    super.onResume()') ||
     (fixedActivity.match(/requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT/g) || []).length !== 2) {
   throw new Error('Generated MainActivity portrait guard does not match expected lifecycle');
+}
+// TauriActivity disables Wry's WebView-history Back handler. Without our
+// AndroidX dispatcher, Android finishes MainActivity even when Setup, a
+// Settings category or another app panel is still open inside the main
+// WebView. Only the exact primary Tauri WebView delivered by WryActivity's
+// onWebViewCreate is eligible; private, automation and ChatGPT WebViews are
+// intentionally never searched or injected.
+const backImports = [
+  'import android.net.Uri',
+  'import android.os.Handler',
+  'import android.os.Looper',
+  'import android.webkit.WebView',
+  'import androidx.activity.OnBackPressedCallback',
+  'import androidx.lifecycle.Lifecycle',
+  'import java.lang.ref.WeakReference',
+];
+for (const importLine of backImports) {
+  if (!fixedActivity.includes(importLine + '\n')) {
+    if (!fixedActivity.includes('import android.os.Bundle\n')) {
+      throw new Error('Generated MainActivity import insertion anchor unavailable');
+    }
+    fixedActivity = fixedActivity.replace('import android.os.Bundle\n',
+      'import android.os.Bundle\n' + importLine + '\n');
+  }
+}
+// A fixed, zero-argument script (no DOM input, URLs, credentials or arbitrary
+// statements from the renderer). Event listeners handle navigation
+// synchronously and preventDefault() makes the receipt true.
+const backDispatchImplementation = String.raw`
+  private var mcpMainWebView: WeakReference<WebView>? = null
+  private var mcpBackInFlight = false
+  private var mcpBackGeneration = 0
+  private val mcpBackScript =
+    """(function(){const event=new Event('mcp-android-back',{cancelable:true});window.dispatchEvent(event);return event.defaultPrevented;})()"""
+
+  override fun onWebViewCreate(webView: WebView) {
+    super.onWebViewCreate(webView)
+    // Wry calls this hook only for its primary Activity WebView; a dialog or
+    // automation browser does not register its WebView here.
+    mcpMainWebView = WeakReference(webView)
+  }
+
+  private fun isMcpAppAssetUrl(url: String?): Boolean {
+    if (url.isNullOrBlank()) return false
+    return try {
+      val uri = Uri.parse(url)
+      uri.userInfo == null && uri.port == -1 && (
+        (uri.host == "tauri.localhost" && (uri.scheme == "http" || uri.scheme == "https")) ||
+        (uri.host == "localhost" && uri.scheme == "tauri")
+      )
+    } catch (_: Exception) {
+      false
+    }
+  }
+
+  private fun dispatchMcpAndroidBack(unhandled: () -> Unit) {
+    if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+    // A second hardware/gesture Back cannot skip ahead while JS is deciding.
+    if (mcpBackInFlight) return
+    val webView = mcpMainWebView?.get()
+    val initialUrl = webView?.url
+    if (webView == null || !isMcpAppAssetUrl(initialUrl)) {
+      // No app-owned loaded WebView: do not evaluate JS on another origin.
+      unhandled()
+      return
+    }
+    mcpBackInFlight = true
+    val generation = ++mcpBackGeneration
+    // If WebView is destroyed or its callback never fires, unlock Back for a
+    // later attempt; an unknown receipt must NOT accidentally exit Setup.
+    Handler(Looper.getMainLooper()).postDelayed({
+      if (generation == mcpBackGeneration) {
+        mcpBackInFlight = false
+        ++mcpBackGeneration
+      }
+    }, 1500L)
+    try {
+      webView.evaluateJavascript(mcpBackScript) { receipt ->
+        if (generation != mcpBackGeneration) return@evaluateJavascript
+        mcpBackInFlight = false
+        ++mcpBackGeneration
+        // evaluateJavascript returns literal JSON true/false. Never assume
+        // a null or malformed receipt means the root chat was unhandled.
+        if (receipt == "false" && !isFinishing && !isDestroyed &&
+          lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
+          mcpMainWebView?.get() === webView && webView.url == initialUrl &&
+          isMcpAppAssetUrl(webView.url)) {
+          unhandled()
+        }
+      }
+    } catch (_: RuntimeException) {
+      if (generation == mcpBackGeneration) {
+        mcpBackInFlight = false
+        ++mcpBackGeneration
+        // No JavaScript was dispatched: preserve Android's default Back.
+        if (!isFinishing && !isDestroyed) unhandled()
+      }
+    }
+  }
+
+  override fun onStop() {
+    ++mcpBackGeneration
+    mcpBackInFlight = false
+    super.onStop()
+  }
+
+  override fun onDestroy() {
+    ++mcpBackGeneration
+    mcpBackInFlight = false
+    mcpMainWebView = null
+    super.onDestroy()
+  }
+
+  private fun registerMcpAndroidBack() {
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        dispatchMcpAndroidBack {
+          // Call the real Android/Tauri fallback only when JS did not cancel
+          // the event, or when no app WebView exists. Disable ourselves first
+          // so ComponentActivity's dispatcher does not recursively invoke us.
+          isEnabled = false
+          try {
+            @Suppress("DEPRECATION")
+            super@MainActivity.onBackPressed()
+          } finally {
+            isEnabled = true
+          }
+        }
+      }
+    })
+  }
+`;
+const backRegistration = '    registerMcpAndroidBack()';
+const backMarker = '  private var mcpMainWebView: WeakReference<WebView>? = null';
+if (!fixedActivity.includes(backMarker)) {
+  if (!/\n}\s*$/.test(fixedActivity) ||
+      fixedActivity.includes('override fun onBackPressed()') ||
+      fixedActivity.includes('registerMcpAndroidBack()')) {
+    throw new Error('Generated MainActivity Back handler has unexpected source');
+  }
+  fixedActivity = fixedActivity.replace(/\n}(\s*)$/,
+    '\n' + backDispatchImplementation + '\n}$1');
+} else if (!fixedActivity.includes(backDispatchImplementation)) {
+  throw new Error('Generated MainActivity Back handler drifted; refusing an unsafe duplicate');
+}
+if (!fixedActivity.includes(backRegistration)) {
+  const onCreateAnchor = '    super.onCreate(savedInstanceState)';
+  if (!fixedActivity.includes(onCreateAnchor))
+    throw new Error('Generated MainActivity onCreate Back registration anchor missing');
+  fixedActivity = fixedActivity.replace(onCreateAnchor,
+    onCreateAnchor + '\n' + backRegistration);
+}
+if ((fixedActivity.match(/private fun registerMcpAndroidBack\(\)/g) || []).length !== 1 ||
+    (fixedActivity.match(/    registerMcpAndroidBack\(\)/g) || []).length !== 1 ||
+    (fixedActivity.match(/override fun onWebViewCreate\(webView: WebView\)/g) || []).length !== 1 ||
+    (fixedActivity.match(/'mcp-android-back'/g) || []).length !== 1) {
+  throw new Error('Generated MainActivity Back integration must be unique and event-scoped');
 }
 if (fixedActivity !== activity) await writeFile(activityPath, fixedActivity);
 

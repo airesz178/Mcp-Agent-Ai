@@ -93,6 +93,8 @@ jobs:
             if ($attempt -lt 3) { Start-Sleep -Seconds (10 * $attempt) }
           }
           if (-not $built) { throw 'Android native build failed after three attempts' }
+      - name: Verify generated Android Back navigation contract
+        run: node --test scripts/test-android-mainactivity-back.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: Mcp-Agent-Ai-Android
@@ -114,11 +116,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed' }
           $sha256 = (Get-FileHash -LiteralPath $artifact -Algorithm SHA256).Hash
           $notes = @(
-            'Mcp Agent Ai v0.2.2 Android preview 2 for ARM64 devices (Android 8.0+).',
+            'Mcp Agent Ai v0.2.2 Android preview 3 for ARM64 devices (Android 8.0+).',
             '',
             'Install the APK and open Settings → Setup to review permissions, sign in to ChatGPT or select an API provider, and configure the optional MCP Core Tunnel.',
             'Includes Android chat, Plan/Goal, Prime Sub-agents, native private browser, optional tool approvals, skills, and bundled plugin install/disable/uninstall controls.',
             'New: per-project SSH host-key pinning and real process receipts, optional permissioned Termux RUN_COMMAND Node/npm/SSH bridge, plus a read-only official plugin/app update check.',
+            'Fix: system Back from Setup now returns to Settings, then chat. At the root chat, Back returns to the Android launcher. Confirmed on a realme Android 11 device while retaining app data.',
             '',
             'This preview APK is debug signed. A differently signed installation cannot be updated in place; preserve your app data before changing signing identities.',
             'Node/npm are not bundled. Termux and its RUN_COMMAND permission, user consent and separate Node/npm/SSH installation are required. SSH access requires a real native client, pinned host identity and authorized key. Dynamic third-party plugin installation and auto-updates are not included.',
@@ -128,5 +131,5 @@ jobs:
           )
           $notesFile = Join-Path $env:RUNNER_TEMP 'android-preview-release-notes.md'
           $notes | Set-Content -LiteralPath $notesFile -Encoding UTF8
-          gh release create v0.2.2-android-preview.2 $artifact --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title 'Mcp Agent Ai v0.2.2 · Android Preview 2' --notes-file $notesFile
+          gh release create v0.2.2-android-preview.3 $artifact --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title 'Mcp Agent Ai v0.2.2 · Android Preview 3' --notes-file $notesFile
           if ($LASTEXITCODE -ne 0) { throw 'GitHub prerelease creation failed' }

@@ -10673,6 +10673,48 @@ ${prompt}`;
   $("settingsToggle").addEventListener("click", () => setSettings($("settingsPanel").classList.contains("hidden")));
   $("sidebarCustomize").addEventListener("click", () => setSettings($("settingsPanel").classList.contains("hidden")));
   $("settingsClose").addEventListener("click", () => setSettings(false));
+  if (nativeAndroidRuntime) {
+    window.addEventListener("mcp-android-back", (event) => {
+      const handled = () => event.preventDefault();
+      if (androidSshDialog.open) {
+        if (!androidSshBusy) closeAndroidSshDialog();
+        handled();
+        return;
+      }
+      if (!$("settingsPanel").classList.contains("hidden")) {
+        if ($("settingsPanel").dataset.settingsNavOpen === "true")
+          setSettings(false);
+        else
+          returnToAndroidSettingsDirectory();
+        handled();
+        return;
+      }
+      if (!$("androidViewMenu").classList.contains("hidden")) {
+        closeAndroidViewMenu();
+        handled();
+        return;
+      }
+      if (!["androidComposeAddMenu", "androidComposeModeMenu", "androidComposeMoreMenu"].every((id) => $(id).classList.contains("hidden"))) {
+        closeAndroidComposerMenus();
+        handled();
+        return;
+      }
+      if (!$("toolViewPanel").classList.contains("hidden")) {
+        closeToolPanel();
+        handled();
+        return;
+      }
+      if (!$("extrasPanel").classList.contains("hidden")) {
+        closeExtrasPanel();
+        handled();
+        return;
+      }
+      if (sidebarOpen) {
+        closeSidebar();
+        handled();
+      }
+    });
+  }
   $("keyToggle").addEventListener("click", () => {
     if (["ollama", "hermes", "chatgpt-browser"].includes($("provider").value)) {
       announce("This engine manages its own model access", true);

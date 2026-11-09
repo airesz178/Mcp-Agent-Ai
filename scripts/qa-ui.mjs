@@ -1590,6 +1590,28 @@ try {
     'Escape from a category must reveal COS sidebar without closing Settings');
   ensure(await android.evaluate(() => document.activeElement?.id !== 'androidSettingsSearch'),
     'Escape from a Settings category reopened the Android Search keyboard');
+  await android.locator('[data-android-settings-category="setup"]').click();
+  ensure(await android.evaluate(() => {
+    const event = new Event('mcp-android-back', {cancelable:true});
+    window.dispatchEvent(event);
+    return event.defaultPrevented &&
+      document.getElementById('settingsPanel').dataset.settingsNavOpen === 'true';
+  }), 'Android system Back must return from Setup details to Settings directory');
+  ensure(await android.evaluate(() => {
+    const event = new Event('mcp-android-back', {cancelable:true});
+    window.dispatchEvent(event);
+    return event.defaultPrevented &&
+      document.getElementById('settingsPanel').classList.contains('hidden');
+  }), 'Second Android system Back must return to chat without killing the Activity');
+  ensure(await android.evaluate(() => {
+    const event = new Event('mcp-android-back', {cancelable:true});
+    window.dispatchEvent(event);
+    return !event.defaultPrevented;
+  }), 'Android system Back at root chat must remain available for OS exit');
+  await android.evaluate(() => document.getElementById('settingsToggle').click());
+  ensure(await android.locator('#settingsPanel').isVisible() &&
+    await android.locator('#settingsPanel').getAttribute('data-settings-nav-open') === 'true',
+    'Android Settings must reopen normally after handling system Back');
   await android.locator('[data-android-settings-category="appearance"]').click();
   await android.locator('#androidAppearanceTheme').selectOption('oled');
   await android.locator('#androidAppearanceDensity').selectOption('compact');
