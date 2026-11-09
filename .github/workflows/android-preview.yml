@@ -57,18 +57,10 @@ jobs:
             if ($attempt -lt 3) { Start-Sleep -Seconds 5 }
           }
           if (-not $ready) { throw 'Gradle distribution failed after three timed attempts' }
-          $project = Join-Path $PWD 'src-tauri/gen/android'
-          $dependenciesReady = $false
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
-            & $wrapper --project-dir $project help --no-daemon
-            if ($LASTEXITCODE -eq 0) { $dependenciesReady = $true; break }
-            Write-Warning "Gradle dependency resolution attempt $attempt failed; retrying transient registry errors"
-            if ($attempt -lt 3) { Start-Sleep -Seconds (10 * $attempt) }
-          }
-          if (-not $dependenciesReady) { throw 'Gradle dependencies failed after three attempts' }
       - name: Build one native Android APK
         shell: pwsh
         run: |
+          $env:GRADLE_OPTS = '-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000'
           $built = $false
           for ($attempt = 1; $attempt -le 3; $attempt++) {
             npm run native:android
